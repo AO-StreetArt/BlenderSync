@@ -10,8 +10,8 @@ The main idea is to stand up message queue's which Blender can query, which are 
 
 Please note that BlenderSync is still highly experimental and, as such, the feature set is currently quite limited.  However, a solid framework has been built to quickly add many new operations to the feature set.
 
-1. Synchronize Location, Rotation, and Scale across all active in the scene which are entered into the DB manually
-2. Add a mesh cube to the DB from a Blender Instance
+* Synchronize Location, Rotation, and Scale across all active in the scene which are entered into the DB manually
+* Add a mesh cube to the DB from a Blender Instance
 
 #Install
 BlenderSync is not a single application, rather it is a pre-built (but not configured) Database Server with a set of python scripts to be executed independently, as well as a collection of [Blender](http://www.blender.org) Add-Ons.  The downside to this is that install is somewhat difficult. 
@@ -26,9 +26,11 @@ $python3 Blender_BaseScene.py
 ```
 
 ##Python Dependencies
+```
 (sudo) pip install zmq
 (sudo) pip install apscheduler
 (sudo) pip install rethinkdb
+```
 
 Use Sudo at your own discretion.
 
@@ -36,58 +38,59 @@ Use Sudo at your own discretion.
 ###Set up Blender's Python Instance
 Using BlenderSync requires installing 0MQ into Blender's Python.  This can be done in a number of ways:
 
-1. Follow the instructions [here](http://www.blender.org/api/blender_python_api_2_63_release/info_tips_and_tricks.html) to push blender to fallback to the system python.  This is the recommended solution
+* Follow the instructions [here](http://www.blender.org/api/blender_python_api_2_63_release/info_tips_and_tricks.html) to push blender to fallback to the system python.  This is the recommended solution
 
-2. Alternatively, you can manually move 0MQ & APScheduler and their dependecies to your system python.  Follow the instructions in the Python Dependencies section, and then manually copy all of the output files into the blender python/lib directory.
+* Alternatively, you can manually move 0MQ & APScheduler and their dependecies to your system python.  Follow the instructions in the Python Dependencies section, and then manually copy all of the output files into the blender python/lib directory.
 
 Note: The following files had to be copied directly into blender python/lib from system python libraries for APScheduler to function correctly.
-six.py
-pkg_resources.py
+
+  * six.py
+  * pkg_resources.py
 
 ###Install the Addons
-1. Start up an instance of blender and install the addons in the addons folder into blender
+* Start up an instance of blender and install the addons in the addons folder into blender
 
 Note: This requires that 0MQ is installed into the blender python
 
-2. Enable both addons.  This enables two commands which can be accessed via spacebar searching for 'rethink' to automatically push and pull updates from the db.  Please remember that your queues should be on and connected prior to running these commands to turn the updates on.
+* Enable both addons.  This enables two commands which can be accessed via spacebar searching for 'rethink' to automatically push and pull updates from the db.  Please remember that your queues should be on and connected prior to running these commands to turn the updates on.
 
 #Usage
 ##Local
-1. Start RethinkDB Server
+* Start RethinkDB Server
 
 ```
 $rethinkdb
 ```
 
-2. If necessary, create the base objects in the table using the Blender_BaseScene.py file
+* If necessary, create the base objects in the table using the Blender_BaseScene.py file
 
 ```
 $python3 Blender_BaseScene.py
 ```
 
-3. Start the 0MQ Queue
+* Start the 0MQ Queue
 
 ```
 $python3 0mq_Q.py tcp://*:5555 0mq_Q.log Debug
 ```
 
-4. Start the Outbound DB Feed
+* Start the Outbound DB Feed
 
 ```
 $python3 tablechange_feed_to0mq.py localhost 28015 objects tcp://localhost:5555 tablechange_feed.log Debug
 ```
 
-5. Start the Inbound DB Feed
+* Start the Inbound DB Feed
 
 ```
 $python3 tablechange_feed_from_0mq.py localhost 28015 tcp://*:5557 tablechange_feed_in.log Debug
 ```
 
-9. Another instance of the 0MQ Queue and the Outbound DB Feed can be started on port 5556.  
+* Another instance of the 0MQ Queue and the Outbound DB Feed can be started on port 5556.  
 
-10. Start two independent instances of blender.  Use the spacebar search to find 'rethink', and you will find both commands to start automated updates from a particular set of 0MQ Queues.  Each instance of blender should connect to it's own 0MQ Queue ('Enable Updates from RethinkDB'), but all instances of blender can connect to the same Inbound DB Feed ('Enable Automatic Updates to RethinkDB') or different ones, it's up to you.
+* Start two independent instances of blender.  Use the spacebar search to find 'rethink', and you will find both commands to start automated updates from a particular set of 0MQ Queues.  Each instance of blender should connect to it's own 0MQ Queue ('Enable Updates from RethinkDB'), but all instances of blender can connect to the same Inbound DB Feed ('Enable Automatic Updates to RethinkDB') or different ones, it's up to you.
 
-11. Update one blender instance, and the update will be shown (potentially after a slight delay) on both screens
+* Update one blender instance, and the update will be shown (potentially after a slight delay) on both screens
 
 ##Remote
 BlenderSync has yet to be tested across a network, but all of the communications protocols utilized allow for network communication
