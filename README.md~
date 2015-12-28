@@ -68,19 +68,19 @@ $rethinkdb
 $python3 Blender_BaseScene.py
 ```
 
-* Start the 0MQ Queue (Input Parameters can be viewed by running scripts without any command line arguments)
+* Start the 0MQ Queue
 
 ```
 $python3 0mq_Q.py tcp://*:5555 0mq_Q.log Debug
 ```
 
-* Start the Outbound DB Feed (Input Parameters can be viewed by running scripts without any command line arguments)
+* Start the Outbound DB Feed
 
 ```
 $python3 tablechange_feed_to0mq.py localhost 28015 objects tcp://localhost:5555 tablechange_feed.log Debug
 ```
 
-* Start the Inbound DB Feed (Input Parameters can be viewed by running scripts without any command line arguments)
+* Start the Inbound DB Feed
 
 ```
 $python3 tablechange_feed_from_0mq.py localhost 28015 tcp://*:5557 tablechange_feed_in.log Debug
