@@ -21,8 +21,8 @@ import bpy
 import zmq
 
 class AddCubeToRethinkDB(bpy.types.Operator):
-    bl_idname = "object.create_cube"
-    bl_label = "Create Cube"
+    bl_idname = "object.create_rethink_cube"
+    bl_label = "Rethink Cube"
     bl_options = {'REGISTER', 'UNDO'}
     soc = bpy.props.StringProperty(name="Outbound 0MQ Socket", default="tcp://localhost:5557")
     name = bpy.props.StringProperty(name="Name", default="Cube")

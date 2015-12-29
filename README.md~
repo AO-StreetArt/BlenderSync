@@ -2,7 +2,7 @@
 
 BlenderSync is a set of tools allowing for real-time integration of multiple [Blender](http://www.blender.org) instances across a network.
 
-It is built on RethinkDB, a NoSQL Database Server, with 0MQ for inter-process communication.
+It is built on [RethinkDB](https://www.rethinkdb.com/), a NoSQL Database Server, with 0MQ for inter-process communication.
 
 The main idea is to stand up message queue's which Blender can query, which are always up-to-date with changelogs coming out of the database.  Each instance of blender gets a changestream (a RethinkDB concept) and a message queue to read from.  Each blender instances also gets an outbound queue to write changes to.  Instead of operations directly making updates to the blender instances, they simply wrap the desired changes into a JSON message and pass this to the outbound message queue.  This queue pulls the messages off independently and writes to the DB based on these JSON documents.  The database generates JSON messages out to any queue's subscribed to a changestream, which are then picked up by all connected blender instances and updated simultaneously.
 
@@ -10,8 +10,8 @@ The main idea is to stand up message queue's which Blender can query, which are 
 
 Please note that BlenderSync is still highly experimental and, as such, the feature set is currently quite limited.  However, a solid framework has been built to quickly add many new operations to the feature set.
 
-* Synchronize Location, Rotation, and Scale across all active in the scene which are entered into the DB manually
-* Add a mesh cube to the DB from a Blender Instance
+* Synchronize Location, Rotation, and Scale across all active in the scene which are entered into the DB manually (ie. via the seed script, using the python shell to connect to the DB, etc)
+* Add a mesh cube to the DB from a Blender Instance, and add a cube in each blender instance upon receipt of the DB Creation message
 
 #Install
 BlenderSync is not a single application, rather it is a pre-built (but not configured) Database Server with a set of python scripts to be executed independently, as well as a collection of [Blender](http://www.blender.org) Add-Ons.  The downside to this is that install is somewhat difficult. 
@@ -52,7 +52,7 @@ Note: The following files had to be copied directly into blender python/lib from
 
 Note: This requires that 0MQ is installed into the blender python
 
-* Enable both addons.  This enables two commands which can be accessed via spacebar searching for 'rethink' to automatically push and pull updates from the db.  Please remember that your queues should be on and connected prior to running these commands to turn the updates on.
+* Enable both addons.  This enables three commands which can be accessed via spacebar searching for 'rethink' to automatically push and pull updates from the db, as well as add a cube.  Please remember that your queues should be on and connected prior to running these commands to turn the updates on.
 
 #Usage
 ##Local
@@ -68,19 +68,19 @@ $rethinkdb
 $python3 Blender_BaseScene.py
 ```
 
-* Start the 0MQ Queue
+* Start the 0MQ Queue (Input Parameters can be viewed by running scripts without any command line arguments)
 
 ```
 $python3 0mq_Q.py tcp://*:5555 0mq_Q.log Debug
 ```
 
-* Start the Outbound DB Feed
+* Start the Outbound DB Feed (Input Parameters can be viewed by running scripts without any command line arguments)
 
 ```
 $python3 tablechange_feed_to0mq.py localhost 28015 objects tcp://localhost:5555 tablechange_feed.log Debug
 ```
 
-* Start the Inbound DB Feed
+* Start the Inbound DB Feed (Input Parameters can be viewed by running scripts without any command line arguments)
 
 ```
 $python3 tablechange_feed_from_0mq.py localhost 28015 tcp://*:5557 tablechange_feed_in.log Debug
