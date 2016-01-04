@@ -23,6 +23,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import zmq
 
+#Utility Methods
+def euclidean_distance_3d(x1, y1, z1, x2, y2, z2):
+    return (((x2 - x1) ** 2) + ((y2 - y1) ** 2) + ((z2 - z1) ** 2)) ** 0.5
+    
+def euclidean_distance_4d(w1, x1, y1, z1, w2, x2, y2, z2):
+    return (((x2 - x1) ** 2) + ((y2 - y1) ** 2) + ((z2 - z1) ** 2)) ** 0.5
+
 class LastMsgData():
     loc = [0.0, 0.0, 0.0]
     rote = [0.0, 0.0, 0.0]
@@ -89,10 +96,15 @@ class UpdateToDatabase(bpy.types.Operator):
             sc_y = obj.scale.y
             sc_z = obj.scale.z
             
-            if last_loc[0] != loc_x or last_loc[1] != loc_y or last_loc[2] != loc_z or last_rote[0] != rote_x or\
-                last_rote[0] != rote_x or last_rote[1] != rote_y or last_rote[2] != rote_z or last_rotq[0] != rotq_w or\
-                    last_rotq[1] != rotq_x or last_rotq[2] != rotq_y or last_rotq[3] != rotq_z or last_scale[0] != sc_x or\
-                        last_scale[1] != sc_y or last_scale[2] != sc_z:
+            if euclidean_distance_3d(last_loc[0], last_loc[1], last_loc[2], loc_x, loc_y, loc_z) < 0.01 or\
+                euclidean_distance_3d(last_rote[0], last_rote[1], last_rote[2], rote_x, rote_y, rote_z) < 0.01 or\
+                    euclidean_distance_4d(last_rotq[0], last_rotq[1], last_rotq[2], last_rotq[3], rotq_w, rotq_x, rotq_y, rotq_z) < 0.01 or\
+                        euclidean_distance_3d(last_scale[0], last_scale[1], last_scale[2], sc_x, sc_y, sc_z) < 0.01:
+            
+#            if last_loc[0] != loc_x or last_loc[1] != loc_y or last_loc[2] != loc_z or last_rote[0] != rote_x or\
+#                last_rote[0] != rote_x or last_rote[1] != rote_y or last_rote[2] != rote_z or last_rotq[0] != rotq_w or\
+#                    last_rotq[1] != rotq_x or last_rotq[2] != rotq_y or last_rotq[3] != rotq_z or last_scale[0] != sc_x or\
+#                        last_scale[1] != sc_y or last_scale[2] != sc_z:
             
                 #Wrap the values in a json message and send it to the Outbound Queue
                 msg = '{"msg_type": "Update", "name": "%s","type": "%s","location": {"x": %s, "y": %s, "z": %s},"rotation_euler": {"x": %s, "y": %s, "z": %s}\
