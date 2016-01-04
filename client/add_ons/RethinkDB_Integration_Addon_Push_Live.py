@@ -28,7 +28,7 @@ def euclidean_distance_3d(x1, y1, z1, x2, y2, z2):
     return (((x2 - x1) ** 2) + ((y2 - y1) ** 2) + ((z2 - z1) ** 2)) ** 0.5
     
 def euclidean_distance_4d(w1, x1, y1, z1, w2, x2, y2, z2):
-    return (((x2 - x1) ** 2) + ((y2 - y1) ** 2) + ((z2 - z1) ** 2)) ** 0.5
+    return (((w2 - w1) ** 2) + ((x2 - x1) ** 2) + ((y2 - y1) ** 2) + ((z2 - z1) ** 2)) ** 0.5
 
 class LastMsgData():
     loc = [0.0, 0.0, 0.0]
