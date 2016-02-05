@@ -85,27 +85,43 @@ class UpdateFromDatabase(bpy.types.Operator):
                         #Call the cube operator
                         print('Creating new cube from DB')
                         bpy.ops.mesh.primitive_cube_add(radius=1, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+                    
                     elif str(new_subtype) == "Plane":
                         #Call the plane operator
                         print('Creating new plane from DB')
+                        bpy.ops.mesh.primitive_plane_add(radius=1, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+                    
                     elif str(new_subtype) == "Circle":
                         #Call the circle operator
                         print('Creating new circle from DB')
+                        bpy.ops.mesh.primitive_circle_add(radius=1, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+
                     elif str(new_subtype) == "UV Sphere":
                         #Call the uv sphere operator
                         print('Creating new UV Sphere from DB')
+                        bpy.ops.mesh.primitive_uv_sphere_add(size=1, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+
                     elif str(new_subtype) == "Icosphere":
                         #Call the icosphere operator
                         print('Creating new icosphere from DB')
+                        bpy.ops.mesh.primitive_icosphere_add(size=1, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+
                     elif str(new_subtype) == "Cylinder":
                         #Call the circle operator
-                        print('Creating new circle from DB')
+                        print('Creating new cylinder from DB')
+                        bpy.ops.mesh.primitive_cylinder_add(radius=1, depth2, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+
                     elif str(new_subtype) == "Cone":
                         #Call the uv sphere operator
-                        print('Creating new UV Sphere from DB')
-                    elif str(new_subtype) == "Torus":
-                        #Call the icosphere operator
-                        print('Creating new icosphere from DB')
+                        print('Creating new Cone from DB')
+                        bpy.ops.mesh.primitive_cone_add(radius1=1, radius2=0, depth=2, view_align=False, location=(0.0, 0.0, 0.0), layers=(True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False))
+
+                    elif str(new_subtype) == "Custom":
+                        #Call the add custom mesh flow
+                        print('Creating new Cone from DB')
+                    else:
+                        #Unrecognized Mesh type
+                        print('Unrecognized Mesh type')
                         
                     #Find the new object and assign the DB Name to it
                     obj_list = []
