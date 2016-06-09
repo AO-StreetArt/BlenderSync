@@ -1,5 +1,10 @@
 #Welcome to BlenderSync
 
+## Note
+Blender Sync Server Development has ceased.  Instead, Blender Sync will be moved onto an external platform, the basis of which currently resides at [CLyman] (https://github.com/AO-StreetArt/CLyman).  BlenderSync addons will be adjusted to allow configuration of either ZMQ Connections (Local) or HTTP Connections (Remote), and will connect either directly to CLyman or via a Gateway.
+
+##Depreicated Design & Usage
+
 BlenderSync is a set of tools allowing for real-time integration of multiple [Blender](http://www.blender.org) instances across a network.
 
 It is built on [RethinkDB](https://www.rethinkdb.com/), a NoSQL Database Server, with 0MQ for inter-process communication.  The components of BlenderSync can all be run locally to synchronize two instances of blender on the same machine, or each process can run on an independent piece of hardware.  You can mix and match the hardware deployment to your particular configuration, to synchronize blender instances across a single computer, Local Area Network, or larger scale networks.
