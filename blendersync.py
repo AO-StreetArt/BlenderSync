@@ -115,6 +115,8 @@ class AeselScenePanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.register_aesel_device")
         row.operator("object.deregister_aesel_device")
+        row = layout.row()
+        row.operator("object.save_scene_assets")
 
 # Object Panel
 class AeselObjectPanel(bpy.types.Panel):
@@ -186,12 +188,39 @@ class AddAeselScene(bpy.types.Operator):
     bl_idname = "object.add_aesel_scene"
     bl_label = "Create Scene"
     bl_options = {'REGISTER', 'UNDO'}
+    scene_name = bpy.props.StringProperty(name="Scene Name", default="Default")
+    scene_region = bpy.props.StringProperty(name="Scene Region", default="")
+    scene_tag = bpy.props.StringProperty(name="Scene Tags", default="")
+    scene_lat = bpy.props.FloatProperty(name="Scene Latitude", default=-9999.0)
+    scene_lon = bpy.props.FloatProperty(name="Scene Longitude", default=-9999.0)
 
     # Called when operator is run
     def execute(self, context):
+        # Build an Adrestia Query Map
+        query_map = {}
+        if self.scene_region != "":
+            query_map['name'] = self.scene_region
+        if self.scene_tag != "":
+            query_map['tags'] = self.scene_tag.split(",")
+        if self.scene_lat > -9998.0:
+            query_map['latitude'] = self.scene_lat
+        if self.scene_lon > -9998.0:
+            query_map['longitude'] = self.scene_lon
+
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + self.scene_name, json=query_map)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
 
 # TO-DO: Delete a Scene from Aesel and the Scene List
 class DeleteAeselScene(bpy.types.Operator):
@@ -220,24 +249,30 @@ class FindAeselScenes(bpy.types.Operator):
     def execute(self, context):
         # Build an Adrestia Query Map
         query_map = {}
-        if scene_name != "":
-            query_map['name'] = scene_name
-        if scene_region != "":
-            query_map['name'] = scene_region
-        if scene_tag != "":
-            query_map['tags'] = scene_tag.split(",")
-        if scene_lat > -9998.0:
-            query_map['latitude'] = scene_lat
-        if scene_lon > -9998.0:
-            query_map['longitude'] = scene_lon
+        if self.scene_name != "":
+            query_map['name'] = self.scene_name
+        if self.scene_region != "":
+            query_map['name'] = self.scene_region
+        if self.scene_tag != "":
+            query_map['tags'] = self.scene_tag.split(",")
+        if self.scene_lat > -9998.0:
+            query_map['latitude'] = self.scene_lat
+        if self.scene_lon > -9998.0:
+            query_map['longitude'] = self.scene_lon
 
         # execute a request to Aesel
-        r = requests.post(bpy.context.scene['_aesel_url'], json=query_map)
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/data', json=query_map)
         # Parse response JSON
+        print(r)
         response_json = r.json()
+        print(response_json)
 
+        context.scene.aesel_current_scenes.clear()
         for scene in response_json['scenes']:
-            # TO-DO: Populate the Scene List in the UI
+            # Populate the Scene List in the UI
+            new_item = context.scene.aesel_current_scenes.add()
+            new_item.name = scene['name']
             print(scene)
 
         # Let's blender know the operator is finished
@@ -272,6 +307,18 @@ class UpdateAeselScene(bpy.types.Operator):
 class RegisterAeselDevice(bpy.types.Operator):
     bl_idname = "object.register_aesel_device"
     bl_label = "Register"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # Called when operator is run
+    def execute(self, context):
+
+        # Let's blender know the operator is finished
+        return {'FINISHED'}
+
+# TO-DO: Save the selected objects as scene assets
+class SaveSceneAssets(bpy.types.Operator):
+    bl_idname = "object.save_scene_assets"
+    bl_label = "Save Scene Assets"
     bl_options = {'REGISTER', 'UNDO'}
 
     # Called when operator is run
@@ -346,6 +393,7 @@ def register():
     bpy.utils.register_class(FindAeselScenes)
     bpy.utils.register_class(DeleteAeselScene)
     bpy.utils.register_class(AddAeselScene)
+    bpy.utils.register_class(SaveSceneAssets)
     bpy.utils.register_class(LoadAeselConfig)
     bpy.utils.register_class(SaveAeselConfig)
     bpy.utils.register_class(AeselObjectPanel)
@@ -358,6 +406,7 @@ def unregister():
     bpy.utils.unregister_class(AeselObjectPanel)
     bpy.utils.unregister_class(SaveAeselConfig)
     bpy.utils.unregister_class(LoadAeselConfig)
+    bpy.utils.unregister_class(SaveSceneAssets)
     bpy.utils.unregister_class(AddAeselScene)
     bpy.utils.unregister_class(DeleteAeselScene)
     bpy.utils.unregister_class(FindAeselScenes)
