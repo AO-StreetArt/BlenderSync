@@ -42,6 +42,9 @@ import socket
 def set_aesel_auto_update(self, context):
     pass
 
+def get_selected_scene(self, context):
+    return context.scene.aesel_current_scenes[context.scene.list_index].name
+
 # Global Addon Properties
 class BlenderSyncPreferences(bpy.types.AddonPreferences):
     # this must match the addon name, use '__package__'
@@ -88,6 +91,13 @@ class BlenderSyncPanel(bpy.types.Panel):
         row.operator("object.save_aesel_config")
         row.operator("object.load_aesel_config")
 
+# Scene UI List
+class Scene_List(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+        layout.label(item.name)
+
 # Scene Panel
 class AeselScenePanel(bpy.types.Panel):
     """Creates an Aesel Scene UI Panel"""
@@ -106,7 +116,8 @@ class AeselScenePanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.find_aesel_scenes")
         row = layout.row()
-        row.prop(context.scene, 'aesel_current_scenes')
+        row.template_list("Scene_List", "SceneList", context.scene, "aesel_current_scenes", context.scene, "list_index")
+        # row.prop(context.scene, 'aesel_current_scenes')
         row = layout.row()
         row.operator("object.add_aesel_scene")
         row.operator("object.delete_aesel_scene")
@@ -183,7 +194,7 @@ class LoadAeselConfig(bpy.types.Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-# TO-DO: Add a new Scene to the Scene List
+# Add a new Scene to the Scene List
 class AddAeselScene(bpy.types.Operator):
     bl_idname = "object.add_aesel_scene"
     bl_label = "Create Scene"
@@ -199,7 +210,7 @@ class AddAeselScene(bpy.types.Operator):
         # Build an Adrestia Query Map
         query_map = {}
         if self.scene_region != "":
-            query_map['name'] = self.scene_region
+            query_map['region'] = self.scene_region
         if self.scene_tag != "":
             query_map['tags'] = self.scene_tag.split(",")
         if self.scene_lat > -9998.0:
@@ -222,7 +233,7 @@ class AddAeselScene(bpy.types.Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-# TO-DO: Delete a Scene from Aesel and the Scene List
+# Delete a Scene from Aesel and the Scene List
 class DeleteAeselScene(bpy.types.Operator):
     bl_idname = "object.delete_aesel_scene"
     bl_label = "Delete Scene"
@@ -230,6 +241,16 @@ class DeleteAeselScene(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+
+        # execute a request to Aesel
+        selected_name = get_selected_scene(context)
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name)
+
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
@@ -282,7 +303,7 @@ class FindAeselScenes(bpy.types.Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-# TO-DO: Update the selected scene in the Scene List
+# Update the selected scene in the Scene List
 class UpdateAeselScene(bpy.types.Operator):
     bl_idname = "object.update_aesel_scene"
     bl_label = "Update Scene"
@@ -295,6 +316,27 @@ class UpdateAeselScene(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
+        # Build an Adrestia Query Map
+        query_map = {}
+        if self.scene_region != "":
+            query_map['region'] = self.scene_region
+        if self.scene_name != "":
+            query_map['name'] = self.scene_name
+        if self.scene_tag != "":
+            query_map['tags'] = self.scene_tag.split(",")
+        if self.scene_lat > -9998.0:
+            query_map['latitude'] = self.scene_lat
+        if self.scene_lon > -9998.0:
+            query_map['longitude'] = self.scene_lon
+
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name, json=query_map)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
@@ -384,6 +426,7 @@ def register():
     bpy.types.Scene.aesel_current_scenes = bpy.props.CollectionProperty(type=SceneSettingItem)
     bpy.types.Scene.aesel_auto_updates = bpy.props.BoolProperty(name="Sync Auto Updates", update=set_aesel_auto_update)
     bpy.types.Scene.aesel_update_rate = bpy.props.FloatProperty(name="Sync Rate", update=set_aesel_auto_update)
+    bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
     bpy.utils.register_class(DeleteAeselObject)
     bpy.utils.register_class(SaveAeselObject)
     bpy.utils.register_class(SendAeselUpdates)
@@ -397,12 +440,14 @@ def register():
     bpy.utils.register_class(LoadAeselConfig)
     bpy.utils.register_class(SaveAeselConfig)
     bpy.utils.register_class(AeselObjectPanel)
+    bpy.utils.register_class(Scene_List)
     bpy.utils.register_class(AeselScenePanel)
     bpy.utils.register_class(BlenderSyncPanel)
 
 def unregister():
     bpy.utils.unregister_class(BlenderSyncPanel)
     bpy.utils.unregister_class(AeselScenePanel)
+    bpy.utils.unregister_class(Scene_List)
     bpy.utils.unregister_class(AeselObjectPanel)
     bpy.utils.unregister_class(SaveAeselConfig)
     bpy.utils.unregister_class(LoadAeselConfig)
@@ -419,6 +464,7 @@ def unregister():
     del bpy.types.Scene.aesel_current_scenes
     del bpy.types.Scene.aesel_auto_updates
     del bpy.types.Scene.aesel_update_rate
+    del bpy.types.Scene.list_index
     bpy.utils.unregister_class(SceneSettingItem)
     bpy.utils.unregister_class(BlenderSyncPreferences)
 
