@@ -37,11 +37,26 @@ import bpy
 from bpy.props import StringProperty, IntProperty, BoolProperty, CollectionProperty
 import requests
 import socket
+import threading
+
+auto_updates_active = False
 
 # Callbacks
 def set_aesel_auto_update(self, context):
-    pass
+    if not auto_updates_active:
+        auto_updates_active = True
+        thread = threading.Thread(target=send_object_updates, args=())
+        thread.daemon = True
+        thread.start()
+    else:
+        auto_updates_active = False
 
+# TO-DO: Send updates to Aesel for all objects
+def send_object_updates():
+    while(auto_updates_active):
+        pass
+
+# Get the scene currently selected in the scene list
 def get_selected_scene(self, context):
     return context.scene.aesel_current_scenes[context.scene.list_index].name
 
@@ -164,7 +179,7 @@ class AeselObjectPanel(bpy.types.Panel):
 class SaveAeselConfig(bpy.types.Operator):
     bl_idname = "object.save_aesel_config"
     bl_label = "Save Aesel Configuration"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     file_path = bpy.props.StringProperty(name="File Path", default="")
 
     # Called when operator is run
@@ -186,7 +201,7 @@ class SaveAeselConfig(bpy.types.Operator):
 class LoadAeselConfig(bpy.types.Operator):
     bl_idname = "object.load_aesel_config"
     bl_label = "Load Aesel Configuration"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     file_path = bpy.props.StringProperty(name="File Path", default="")
 
     # Called when operator is run
@@ -203,7 +218,7 @@ class LoadAeselConfig(bpy.types.Operator):
 class AddAeselScene(bpy.types.Operator):
     bl_idname = "object.add_aesel_scene"
     bl_label = "Create Scene"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     scene_name = bpy.props.StringProperty(name="Scene Name", default="Default")
     scene_region = bpy.props.StringProperty(name="Scene Region", default="")
     scene_tag = bpy.props.StringProperty(name="Scene Tags", default="")
@@ -242,7 +257,7 @@ class AddAeselScene(bpy.types.Operator):
 class DeleteAeselScene(bpy.types.Operator):
     bl_idname = "object.delete_aesel_scene"
     bl_label = "Delete Scene"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
@@ -264,7 +279,7 @@ class DeleteAeselScene(bpy.types.Operator):
 class FindAeselScenes(bpy.types.Operator):
     bl_idname = "object.find_aesel_scenes"
     bl_label = "Find Scenes"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     scene_name = bpy.props.StringProperty(name="Scene Name", default="")
     scene_region = bpy.props.StringProperty(name="Scene Region", default="")
     scene_tag = bpy.props.StringProperty(name="Scene Tags", default="")
@@ -312,7 +327,7 @@ class FindAeselScenes(bpy.types.Operator):
 class UpdateAeselScene(bpy.types.Operator):
     bl_idname = "object.update_aesel_scene"
     bl_label = "Update Scene"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     scene_name = bpy.props.StringProperty(name="Scene Name", default="")
     scene_region = bpy.props.StringProperty(name="Scene Region", default="")
     scene_tag = bpy.props.StringProperty(name="Scene Tags", default="")
@@ -354,7 +369,7 @@ class UpdateAeselScene(bpy.types.Operator):
 class RegisterAeselDevice(bpy.types.Operator):
     bl_idname = "object.register_aesel_device"
     bl_label = "Register"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
@@ -375,7 +390,7 @@ class RegisterAeselDevice(bpy.types.Operator):
 class SaveSceneAssets(bpy.types.Operator):
     bl_idname = "object.save_scene_assets"
     bl_label = "Save Scene Assets"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
@@ -387,7 +402,7 @@ class SaveSceneAssets(bpy.types.Operator):
 class DeregisterAeselDevice(bpy.types.Operator):
     bl_idname = "object.deregister_aesel_device"
     bl_label = "Deregister"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
@@ -404,15 +419,15 @@ class DeregisterAeselDevice(bpy.types.Operator):
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
-# TO-DO: Send updates on all active aesel objects in the scene
+# Send updates on all active aesel objects in the scene
 class SendAeselUpdates(bpy.types.Operator):
     bl_idname = "object.send_aesel_updates"
     bl_label = "Send Update"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
-
+        send_object_updates()
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -420,7 +435,7 @@ class SendAeselUpdates(bpy.types.Operator):
 class SaveAeselObject(bpy.types.Operator):
     bl_idname = "object.save_aesel_object"
     bl_label = "Save Object"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
@@ -432,7 +447,7 @@ class SaveAeselObject(bpy.types.Operator):
 class DeleteAeselObject(bpy.types.Operator):
     bl_idname = "object.delete_aesel_object"
     bl_label = "Delete Object"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
