@@ -54,6 +54,9 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
     aesel_addr = StringProperty(
             name="Aesel Address"
             )
+    device_id = StringProperty(
+            name="Blender Device ID"
+            )
     udp_host = StringProperty(
             name="Blender IP Address",
             default="127.0.0.1",
@@ -156,6 +159,8 @@ class AeselObjectPanel(bpy.types.Panel):
 # Operators
 
 # TO-DO: Save the Aesel configuration to a JSON File
+# Basically, needs to save the scene we're registered to
+# User preferences are saved as part of Blender User Preferences
 class SaveAeselConfig(bpy.types.Operator):
     bl_idname = "object.save_aesel_config"
     bl_label = "Save Aesel Configuration"
@@ -345,7 +350,7 @@ class UpdateAeselScene(bpy.types.Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-# TO-DO: Register to the selected scene in the scene list
+# Register to the selected scene in the scene list
 class RegisterAeselDevice(bpy.types.Operator):
     bl_idname = "object.register_aesel_device"
     bl_label = "Register"
@@ -353,7 +358,16 @@ class RegisterAeselDevice(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
 
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        payload = {'device_id': addon_prefs.device_id, 'hostname': addon_prefs.udp_host, 'port': addon_prefs.udp_port}
+        r = requests.put(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + 'registration', params=payload)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -369,7 +383,7 @@ class SaveSceneAssets(bpy.types.Operator):
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
-# TO-DO: Deregister from the selected scene in the scene list
+# Deregister from the selected scene in the scene list
 class DeregisterAeselDevice(bpy.types.Operator):
     bl_idname = "object.deregister_aesel_device"
     bl_label = "Deregister"
@@ -377,7 +391,16 @@ class DeregisterAeselDevice(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
 
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        payload = {'device_id': addon_prefs.device_id}
+        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + 'registration', params=payload)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
