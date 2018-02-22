@@ -38,10 +38,13 @@ from bpy.props import StringProperty, IntProperty, BoolProperty, CollectionPrope
 import requests
 import socket
 import threading
+import os
+from datetime import datetime
 
+# TO-DO: Support Object Locking, and only send updates on locked objects
 auto_updates_active = False
 
-# Callbacks
+# Callback for auto updates
 def set_aesel_auto_update(self, context):
     if not auto_updates_active:
         auto_updates_active = True
@@ -50,6 +53,24 @@ def set_aesel_auto_update(self, context):
         thread.start()
     else:
         auto_updates_active = False
+
+# Save an asset
+def save_asset(context):
+    # Export the blender object to an Obj file
+    blend_file_path = bpy.data.filepath
+    directory = os.path.dirname(blend_file_path)
+    target_file = os.path.join(directory, 'asset-' + str(datetime.now()) + '.obj')
+    bpy.ops.export_scene.obj(filepath=target_file, axis_up='Y', use_selection=True,
+                             use_mesh_modifiers=True, use_edges=True, use_normals=True,
+                             use_uvs=True, use_materials=True, use_nurbs=True,
+                             use_blen_objects=True, group_by_object=True, keep_vertex_order=True, global_scale=1)
+
+    # Post the file as form data to Aesel
+    file_data = {'file': open(target_file, 'rb')}
+    addon_prefs = context.user_preferences.addons[__name__].preferences
+    r = requests.post(addon_prefs.aesel_addr + '/v1/asset/', files=file_data)
+    print(r)
+    return [r.text]
 
 # TO-DO: Send updates to Aesel for all objects
 def send_object_updates():
@@ -135,7 +156,6 @@ class AeselScenePanel(bpy.types.Panel):
         row.operator("object.find_aesel_scenes")
         row = layout.row()
         row.template_list("Scene_List", "SceneList", context.scene, "aesel_current_scenes", context.scene, "list_index")
-        # row.prop(context.scene, 'aesel_current_scenes')
         row = layout.row()
         row.operator("object.add_aesel_scene")
         row.operator("object.delete_aesel_scene")
@@ -383,10 +403,19 @@ class RegisterAeselDevice(bpy.types.Operator):
         print(r)
         response_json = r.json()
         print(response_json)
+
+        # TO-DO: Download Scene Assets
+
+        # TO-DO: Download Objects
+
+        # TO-DO: Download Object Assets
+
+        # TO-DO: Start listening on the UDP port on a background thread
+
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
-# TO-DO: Save the selected objects as scene assets
+# Save the selected objects as scene assets
 class SaveSceneAssets(bpy.types.Operator):
     bl_idname = "object.save_scene_assets"
     bl_label = "Save Scene Assets"
@@ -394,6 +423,21 @@ class SaveSceneAssets(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+
+        id_list = save_asset(context)
+
+        # Update the scene with the new Asset ID's
+        selected_name = get_selected_scene(context)
+        # Build an Adrestia Query Map
+        query_map = {'assets': id_list}
+
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name, json=query_map)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
@@ -431,7 +475,7 @@ class SendAeselUpdates(bpy.types.Operator):
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
-# TO-DO: Save the active object to Aesel
+# Save the active object to Aesel
 class SaveAeselObject(bpy.types.Operator):
     bl_idname = "object.save_aesel_object"
     bl_label = "Save Object"
@@ -439,6 +483,48 @@ class SaveAeselObject(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
+        obj = bpy.context.active_object
+        # Build an Adrestia Object
+        # Currently only tracking global x rotation, current design is going to force
+        # some additional math to include everything else (See Issue #37 in Adrestia)
+        obj_json = {
+                    "name": obj.name,
+                    "type": "mesh",
+                    "subtype": "custom",
+                    "owner": "",
+                    "translation": [obj.location.x,
+                                    obj.location.y,
+                                    obj.location.z],
+                    "rotation_euler": [obj.rotation_euler.x, 1.0, 0.0, 0.0],
+                    "scale": [obj.scale.x,
+                              obj.scale.y,
+                              obj.scale.z]
+                    }
+
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name, json=obj_json)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
+
+        # Save Object Assets
+        id_list = save_asset(context)
+
+        # Update the scene with the new Asset ID's
+        selected_name = get_selected_scene(context)
+        # Build an Adrestia Query Map
+        query_map = {'assets': id_list}
+
+        # execute a request to Aesel
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name, json=query_map)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
@@ -451,6 +537,10 @@ class DeleteAeselObject(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+
+        # Delete the object assets
+
+        # Delete the object
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
