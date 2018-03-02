@@ -70,6 +70,7 @@ def save_asset(context):
     addon_prefs = context.user_preferences.addons[__name__].preferences
     r = requests.post(addon_prefs.aesel_addr + '/v1/asset/', files=file_data)
     print(r)
+    print(r.text)
     return [r.text]
 
 # TO-DO: Send updates to Aesel for all objects
@@ -78,7 +79,7 @@ def send_object_updates():
         pass
 
 # Get the scene currently selected in the scene list
-def get_selected_scene(self, context):
+def get_selected_scene(context):
     return context.scene.aesel_current_scenes[context.scene.list_index].name
 
 # Global Addon Properties
@@ -106,6 +107,7 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
         layout = self.layout
         layout.label(text="Blender Sync Preferences")
         layout.prop(self, "aesel_addr")
+        layout.prop(self, "device_id")
         layout.prop(self, "udp_host")
         layout.prop(self, "udp_port")
 
@@ -397,8 +399,8 @@ class RegisterAeselDevice(bpy.types.Operator):
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'device_id': addon_prefs.device_id, 'hostname': addon_prefs.udp_host, 'port': addon_prefs.udp_port}
-        r = requests.put(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + 'registration', params=payload)
+        payload = {'device_id': addon_prefs.device_id, 'device_host': addon_prefs.udp_host, 'device_port': addon_prefs.udp_port}
+        r = requests.put(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + '/registration', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -485,6 +487,9 @@ class SaveAeselObject(bpy.types.Operator):
     def execute(self, context):
         selected_name = get_selected_scene(context)
         obj = bpy.context.active_object
+        # Save Object Assets
+        id_list = save_asset(context)
+        # TO-DO: Save Asset ID into custom property on object
         # Build an Adrestia Object
         # Currently only tracking global x rotation, current design is going to force
         # some additional math to include everything else (See Issue #37 in Adrestia)
@@ -499,28 +504,13 @@ class SaveAeselObject(bpy.types.Operator):
                     "rotation_euler": [obj.rotation_euler.x, 1.0, 0.0, 0.0],
                     "scale": [obj.scale.x,
                               obj.scale.y,
-                              obj.scale.z]
+                              obj.scale.z],
+                    "assets": id_list
                     }
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
         r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name, json=obj_json)
-        # Parse response JSON
-        print(r)
-        response_json = r.json()
-        print(response_json)
-
-        # Save Object Assets
-        id_list = save_asset(context)
-
-        # Update the scene with the new Asset ID's
-        selected_name = get_selected_scene(context)
-        # Build an Adrestia Query Map
-        query_map = {'assets': id_list}
-
-        # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name, json=query_map)
         # Parse response JSON
         print(r)
         response_json = r.json()
