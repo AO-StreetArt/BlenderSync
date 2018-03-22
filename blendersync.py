@@ -35,6 +35,7 @@ bl_info = {
 
 import bpy
 from bpy.props import StringProperty, IntProperty, BoolProperty, CollectionProperty
+import mathutils
 import requests
 import socket
 import threading
@@ -42,6 +43,10 @@ import os
 from datetime import datetime
 
 # TO-DO: Support Object Locking, and only send updates on locked objects
+# TO-DO: Handle Objects with multiple mesh assets
+# TO-DO: Handle Objects with different kinds of assets (some shader-based asset type, also fbx for armatures)
+# TO-DO: Add Primitive Support
+# TO-DO: UI is only active when an object is selected, should be all the time
 auto_updates_active = False
 
 # Callback for auto updates
@@ -406,11 +411,49 @@ class RegisterAeselDevice(bpy.types.Operator):
         response_json = r.json()
         print(response_json)
 
-        # TO-DO: Download Scene Assets
+        # Get the Scene
+        scene_response = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name)
+        scene_response_json = scene_response.json()
+        print(scene_response_json)
 
-        # TO-DO: Download Objects
+        # Download Scene Assets
+        for asset in scene_response_json['asset_ids']:
+            r = requests.get(addon_prefs.aesel_addr + '/v1/asset/' + asset, allow_redirects=True)
+            filename = 'asset-%s' % asset
+            with open(filename, 'wb') as asset_file:
+                asset_file.write(r.content)
 
-        # TO-DO: Download Object Assets
+            # Import the scene asset
+            imported_object = bpy.ops.import_scene.obj(filepath=filename)
+            imported_blender_object = bpy.context.selected_objects[0]
+            print('Imported Name %s' % imported_blender_object.name)
+
+        # Download Objects
+        object_response = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + '/object')
+        object_response_json = object_response.json()
+        print(object_response_json)
+        for record in object_response_json['objects']:
+
+            # Download Object Assets
+            for asset in record['assets']:
+                r = requests.get(addon_prefs.aesel_addr + '/v1/asset/' + asset, allow_redirects=True)
+                filename = 'asset-%s' % asset
+                with open(filename, 'wb') as asset_file:
+                    asset_file.write(r.content)
+
+                # Import the object asset
+                imported_object = bpy.ops.import_scene.obj(filepath=filename)
+                imported_blender_object = bpy.context.selected_objects[0]
+                print('Imported Name %s' % imported_blender_object.name)
+
+                # Update object attributes
+                imported_blender_object.name = record['name']
+
+                # Apply object transforms
+                transform = mathutils.Matrix.Identity(4)
+                for i in range(16):
+                    transform[int(i/4)][i%4] = record['transform'][i]
+                imported_blender_object.matrix_world = transform*imported_blender_object.matrix_world
 
         # TO-DO: Start listening on the UDP port on a background thread
 
@@ -431,7 +474,7 @@ class SaveSceneAssets(bpy.types.Operator):
         # Update the scene with the new Asset ID's
         selected_name = get_selected_scene(context)
         # Build an Adrestia Query Map
-        query_map = {'assets': id_list}
+        query_map = {'asset_ids': id_list}
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
@@ -489,7 +532,8 @@ class SaveAeselObject(bpy.types.Operator):
         obj = bpy.context.active_object
         # Save Object Assets
         id_list = save_asset(context)
-        # TO-DO: Save Asset ID into custom property on object
+        # Save Asset ID into custom property on object
+        bpy.context.active_object['asset'] = id_list[0]
         # Build an Adrestia Object
         # Currently only tracking global x rotation, current design is going to force
         # some additional math to include everything else (See Issue #37 in Adrestia)
@@ -519,7 +563,7 @@ class SaveAeselObject(bpy.types.Operator):
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
-# TO-DO: Delete the active object from Aesel
+# Delete the active object from Aesel
 class DeleteAeselObject(bpy.types.Operator):
     bl_idname = "object.delete_aesel_object"
     bl_label = "Delete Object"
@@ -528,9 +572,20 @@ class DeleteAeselObject(bpy.types.Operator):
     # Called when operator is run
     def execute(self, context):
 
-        # Delete the object assets
+        selected_name = get_selected_scene(context)
+        addon_prefs = context.user_preferences.addons[__name__].preferences
 
-        # Delete the object
+        # Delete the object assets
+        if 'asset' in bpy.context.active_object:
+            r = requests.delete(addon_prefs.aesel_addr + '/v1/asset/' + bpy.context.active_object['asset'])
+            print(r)
+
+        # Delete the object from aesel
+        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + bpy.context.active_object.name)
+        print(r)
+
+        # Delete the object from blender
+        bpy.ops.object.delete()
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
