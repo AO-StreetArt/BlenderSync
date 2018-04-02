@@ -1,0 +1,12 @@
+language: python
+python:
+  - "2.7"
+addons:
+  apt:
+    sources:
+    packages:
+      - blender
+before_script:
+  - blender -v
+script:
+  - python tests.py
