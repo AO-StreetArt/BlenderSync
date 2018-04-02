@@ -192,6 +192,8 @@ class AeselObjectPanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.delete_aesel_object")
         row.operator("object.save_aesel_object")
+        row.operator("object.lock_aesel_object")
+        row.operator("object.unlock_aesel_object")
         row = layout.row()
         row.operator("object.send_aesel_updates")
         row = layout.row()
@@ -417,7 +419,7 @@ class RegisterAeselDevice(bpy.types.Operator):
         print(scene_response_json)
 
         # Download Scene Assets
-        for asset in scene_response_json['asset_ids']:
+        for asset in scene_response_json['assets']:
             r = requests.get(addon_prefs.aesel_addr + '/v1/asset/' + asset, allow_redirects=True)
             filename = 'asset-%s' % asset
             with open(filename, 'wb') as asset_file:
@@ -474,7 +476,7 @@ class SaveSceneAssets(bpy.types.Operator):
         # Update the scene with the new Asset ID's
         selected_name = get_selected_scene(context)
         # Build an Adrestia Query Map
-        query_map = {'asset_ids': id_list}
+        query_map = {'assets': id_list}
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
@@ -520,6 +522,44 @@ class SendAeselUpdates(bpy.types.Operator):
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
+# Send lock requests for the active object
+class LockAeselObject(bpy.types.Operator):
+    bl_idname = "object.lock_aesel_object"
+    bl_label = "Lock Object"
+    bl_options = {'REGISTER'}
+
+    # Called when operator is run
+    def execute(self, context):
+        # Execute the request
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        payload = {'owner': addon_prefs.device_id}
+        r = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/lock', params=payload)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
+        # Let's blender know the operator is finished
+        return {'FINISHED'}
+
+# Send unlock requests for the active object
+class UnlockAeselObject(bpy.types.Operator):
+    bl_idname = "object.unlock_aesel_object"
+    bl_label = "Unlock Object"
+    bl_options = {'REGISTER'}
+
+    # Called when operator is run
+    def execute(self, context):
+        # Execute the request
+        addon_prefs = context.user_preferences.addons[__name__].preferences
+        payload = {'owner': addon_prefs.device_id}
+        r = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/unlock', params=payload)
+        # Parse response JSON
+        print(r)
+        response_json = r.json()
+        print(response_json)
+        # Let's blender know the operator is finished
+        return {'FINISHED'}
+
 # Save the active object to Aesel
 class SaveAeselObject(bpy.types.Operator):
     bl_idname = "object.save_aesel_object"
@@ -545,7 +585,9 @@ class SaveAeselObject(bpy.types.Operator):
                     "translation": [obj.location.x,
                                     obj.location.y,
                                     obj.location.z],
-                    "rotation_euler": [obj.rotation_euler.x, 1.0, 0.0, 0.0],
+                    "euler_rotation": [obj.rotation_euler.x,
+                                       obj.rotation_euler.y,
+                                       obj.rotation_euler.z],
                     "scale": [obj.scale.x,
                               obj.scale.y,
                               obj.scale.z],
