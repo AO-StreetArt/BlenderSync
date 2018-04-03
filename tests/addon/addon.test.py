@@ -7,14 +7,12 @@ bpy.ops.wm.addon_install(filepath="/home/travis/build/AO-StreetArt/BlenderSync/b
 bpy.ops.wm.addon_enable(module="blendersync")
 
 #Import the addon for the purposes of the test script
-try:
-    import blendersync
-except Exception as e:
-    sys.exit(1)
+import blendersync
 
 class TestAddon(unittest.TestCase):
     def test_addon_enabled(self):
         self.assertIsNotNone(blendersync.bl_info)
+        self.assertIsNotNone(None)
 
 # we have to manually invoke the test runner here
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestAddon)
