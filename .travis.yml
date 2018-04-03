@@ -11,9 +11,10 @@ before_install:
 install:
   - echo $TRAVIS_BUILD_DIR
   - tests/scripts/install_blender.sh $TRAVIS_BUILD_DIR
+  - source .envs
   - sudo ln -s $TRAVIS_BUILD_DIR/BlenderSync $BLENDER_FOLDER/2.79/scripts/addons/BlenderSync
 script:
-  - python tests.py $BLENDER_EXEC $TRAVIS_BUILD_DIR
+  - python tests.py $BLENDER_FOLDER/blender $TRAVIS_BUILD_DIR
 after_failure:
   - echo $BLENDER_FOLDER
-  - echo $BLENDER_EXEC
+  - echo $BLENDER_FOLDER/blender

@@ -16,8 +16,5 @@ if [ ! -f $TAR ]; then
 fi
 tar -xjf $TAR -C $HOME
 BLENDER_FOLDER=$HOME/$NAME
-BLENDER_EXEC=$BLEND_FOLDER/blender
-export BLENDER_FOLDER
-export BLENDER_EXEC
 echo $BLENDER_FOLDER
-echo $BLENDER_EXEC
+echo "export BLENDER_FOLDER=\"$BLENDER_FOLDER\"" > .envs
