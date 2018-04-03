@@ -10,8 +10,7 @@ bpy.ops.wm.addon_enable(module="blendersync")
 try:
     import blendersync
 except Exception as e:
-    print(e)
-    assert(False)
+    sys.exit(1)
 
 class TestAddon(unittest.TestCase):
     def test_addon_enabled(self):
