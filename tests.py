@@ -19,4 +19,4 @@ for f in glob.glob('./tests/**/*.test.blend'):
     test_file = f.replace('.blend', '.py')
     print(f)
     print(test_file)
-    subprocess.call([blenderExecutable, '--factory-startup', '-noaudio', '-b', f, '--python', test_file, '--', homeDirectory])
+    subprocess.call([blenderExecutable, '--factory-startup', '-noaudio', '-b', f, '--python', test_file, '--python-exit-code', '1'])
