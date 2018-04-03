@@ -1,5 +1,6 @@
 import unittest
 import bpy
+import sys
 
 homeDirectory = sys.argv[1]
 

@@ -15,6 +15,3 @@ install:
   - sudo ln -s $TRAVIS_BUILD_DIR/BlenderSync $BLENDER_FOLDER/2.79/scripts/addons/BlenderSync
 script:
   - python tests.py $BLENDER_FOLDER/blender $TRAVIS_BUILD_DIR
-after_failure:
-  - echo $BLENDER_FOLDER
-  - echo $BLENDER_FOLDER/blender
