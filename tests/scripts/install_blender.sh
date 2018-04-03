@@ -15,5 +15,8 @@ if [ ! -f $TAR ]; then
     wget -O $TAR $URL
 fi
 tar -xjf $TAR -C $HOME
-export BLENDER_FOLDER=$HOME/$NAME
-export BLENDER_EXEC=$BLENDER_FOLDER/blender
+BLEND_FOLDER=$HOME/$NAME
+export BLENDER_FOLDER=$BLEND_FOLDER
+export BLENDER_EXEC=$BLEND_FOLDER/blender
+echo $BLENDER_FOLDER
+echo $BLENDER_EXEC
