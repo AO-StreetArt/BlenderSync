@@ -536,7 +536,7 @@ class LockAeselObject(bpy.types.Operator):
         obj = bpy.context.active_object
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'owner': addon_prefs.device_id}
+        payload = {'owner': addon_pefs.device_id}
         r = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/lock', params=payload)
         # Parse response JSON
         print(r)
