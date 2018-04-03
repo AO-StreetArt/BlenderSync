@@ -6,7 +6,7 @@ addons:
     sources:
     packages:
       - blender
-before_script:
+before_install:
   - blender -v
 install:
   - echo $TRAVIS_BUILD_DIR
