@@ -50,7 +50,7 @@ from datetime import datetime
 auto_updates_active = False
 
 # Callback for auto updates
-df set_aesel_auto_update(self, context):
+def set_aesel_auto_update(self, context):
     if not auto_updates_active:
         auto_updates_active = True
         thread = threading.Thread(target=send_object_updates, args=())
