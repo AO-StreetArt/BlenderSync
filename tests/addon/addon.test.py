@@ -11,7 +11,7 @@ try:
     import blendersync
 except Exception as e:
     print(e)
-    sys.exit(1)
+    assert(False)
 
 class TestAddon(unittest.TestCase):
     def test_addon_enabled(self):
