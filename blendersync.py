@@ -79,7 +79,7 @@ def save_asset(context):
     return [r.text]
 
 # TO-DO: Send updates to Aesel for all objects
-ef send_object_updates():
+def send_object_updates():
     while(auto_updates_active):
         pass
 
