@@ -11,6 +11,6 @@ before_script:
 install:
   - echo $TRAVIS_BUILD_DIR
   - tests/scripts/install_blender.sh $TRAVIS_BUILD_DIR
-  - sudo ln -s $TRAVIS_BUILD_DIR/blendersync $BLENDER_FOLDER/2.79/scripts/addons/blendersync
+  - sudo ln -s $TRAVIS_BUILD_DIR/BlenderSync $BLENDER_FOLDER/2.79/scripts/addons/BlenderSync
 script:
   - python tests.py $BLENDER_EXEC $TRAVIS_BUILD_DIR
