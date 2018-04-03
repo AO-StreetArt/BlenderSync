@@ -8,5 +8,9 @@ addons:
       - blender
 before_script:
   - blender -v
+install:
+  - echo $TRAVIS_BUILD_DIR
+  - tests/scripts/install_blender.sh $TRAVIS_BUILD_DIR
+  - sudo ln -s $TRAVIS_BUILD_DIR/blendersync $BLENDER_FOLDER/2.79/scripts/addons/blendersync
 script:
-  - python tests.py
+  - python tests.py $BLENDER_EXEC $TRAVIS_BUILD_DIR
