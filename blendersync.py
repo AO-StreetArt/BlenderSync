@@ -192,6 +192,7 @@ class AeselObjectPanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.delete_aesel_object")
         row.operator("object.save_aesel_object")
+        row = layout.row()
         row.operator("object.lock_aesel_object")
         row.operator("object.unlock_aesel_object")
         row = layout.row()
@@ -523,6 +524,7 @@ class SendAeselUpdates(bpy.types.Operator):
         return {'FINISHED'}
 
 # Send lock requests for the active object
+# TO-DO: During call to register(), add a list we can store locked objects in for sending updates
 class LockAeselObject(bpy.types.Operator):
     bl_idname = "object.lock_aesel_object"
     bl_label = "Lock Object"
@@ -530,6 +532,8 @@ class LockAeselObject(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
+        obj = bpy.context.active_object
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'owner': addon_prefs.device_id}
@@ -549,10 +553,12 @@ class UnlockAeselObject(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
+        selected_name = get_selected_scene(context)
+        obj = bpy.context.active_object
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'owner': addon_prefs.device_id}
-        r = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/unlock', params=payload)
+        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/lock', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -644,6 +650,8 @@ def register():
     bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
     bpy.utils.register_class(DeleteAeselObject)
     bpy.utils.register_class(SaveAeselObject)
+    bpy.utils.register_class(LockAeselObject)
+    bpy.utils.register_class(UnlockAeselObject)
     bpy.utils.register_class(SendAeselUpdates)
     bpy.utils.register_class(DeregisterAeselDevice)
     bpy.utils.register_class(RegisterAeselDevice)
@@ -674,6 +682,8 @@ def unregister():
     bpy.utils.unregister_class(RegisterAeselDevice)
     bpy.utils.unregister_class(DeregisterAeselDevice)
     bpy.utils.unregister_class(SendAeselUpdates)
+    bpy.utils.unregister_class(UnlockAeselObject)
+    bpy.utils.unregister_class(LockAeselObject)
     bpy.utils.unregister_class(SaveAeselObject)
     bpy.utils.unregister_class(DeleteAeselObject)
     del bpy.types.Scene.aesel_current_scenes
