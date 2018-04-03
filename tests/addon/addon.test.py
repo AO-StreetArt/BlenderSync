@@ -12,7 +12,6 @@ import blendersync
 class TestAddon(unittest.TestCase):
     def test_addon_enabled(self):
         self.assertIsNotNone(blendersync.bl_info)
-        self.assertIsNotNone(None)
 
 # we have to manually invoke the test runner here
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestAddon)
