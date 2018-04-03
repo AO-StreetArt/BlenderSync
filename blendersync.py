@@ -290,7 +290,7 @@ class DeleteAeselScene(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     # Called when operator is run
-    de execute(self, context):
+    def execute(self, context):
 
         # execute a request to Aesel
         selected_name = get_selected_scene(context)
