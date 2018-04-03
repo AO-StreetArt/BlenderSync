@@ -7,7 +7,11 @@ bpy.ops.wm.addon_install(filepath="/home/travis/build/AO-StreetArt/BlenderSync/b
 bpy.ops.wm.addon_enable(module="blendersync")
 
 #Import the addon for the purposes of the test script
-import blendersync
+try:
+    import blendersync
+except Exception as e:
+    print(e)
+    sys.exit(1)
 
 class TestAddon(unittest.TestCase):
     def test_addon_enabled(self):
