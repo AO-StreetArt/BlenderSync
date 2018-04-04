@@ -26,7 +26,7 @@ THE SOFTWARE.
 
 bl_info = {
     "name": "BlenderSync",
-    "author": "AO Street Art",
+    "author": "AO Labs",
     "version": (0, 0, 1),
     "blender": (2, 79, 0),
     "description": "Blender Add on to integrate with other instances via Aesel",
@@ -41,8 +41,8 @@ import socket
 import threading
 import os
 from datetime import datetime
+import time
 
-# TO-DO: Support Object Locking, and only send updates on locked objects
 # TO-DO: Handle Objects with multiple mesh assets
 # TO-DO: Handle Objects with different kinds of assets (some shader-based asset type, also fbx for armatures)
 # TO-DO: Add Primitive Support
@@ -51,11 +51,14 @@ auto_updates_active = False
 
 # Callback for auto updates
 def set_aesel_auto_update(self, context):
-    if not auto_updates_active:
+    if not bpy.context.scene.aesel_auto_updates:
         auto_updates_active = True
-        thread = threading.Thread(target=send_object_updates, args=())
-        thread.daemon = True
-        thread.start()
+        send_thread = threading.Thread(target=send_object_updates, args=())
+        send_thread.daemon = True
+        send_thread.start()
+        recv_thread = threading.Thread(target=listen_for_object_updates, args=())
+        recv_thread.daemon = True
+        recv_thread.start()
     else:
         auto_updates_active = False
 
@@ -78,10 +81,58 @@ def save_asset(context):
     print(r.text)
     return [r.text]
 
-# TO-DO: Send updates to Aesel for all objects
+# Listen for updates from Aesel
+def listen_for_object_updates():
+    # Create a TCP/IP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Bind the socket to the port
+    server_address = ('localhost', 10000)
+    sock.bind(server_address)
+    while(bpy.context.scene.aesel_auto_updates):
+        # Recieve a message from Aesel
+        data, address = sock.recvfrom(8192)
+        if data:
+            data_dict = json.loads(data.decode("utf-8"))
+            obj = bpy.data.objects[data_dict['name']]
+            transform = data_dict['transform']
+            obj.matrix_world = mathutils.Matrix((transform[0], transform[1], transform[2], transform[3]),
+                                                (transform[4], transform[5], transform[6], transform[7]),
+                                                (transform[8], transform[9], transform[10], transform[11]),
+                                                (transform[12], transform[13], transform[14], transform[15]))
+
+
+# Send updates to Aesel for all locked objects
 def send_object_updates():
-    while(auto_updates_active):
-        pass
+    global auto_updates_active
+    addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    while(bpy.context.scene.aesel_auto_updates):
+        for elt in bpy.context.scene.aesel_live_objects:
+            start_time = int(round(time.time() * 1000))
+            aesel_key = elt[0]
+            object_name = elt[1]
+            obj = bpy.data.objects[object_name]
+            # Send the actual message
+            sock.sendto(bytes("""{"key": "%s",
+                                  "translation": [%s, %s, %s],
+                                  "euler_rotation": [%s, %s, %s],
+                                  "scale": [%s, %s, %s]}""" % (aesel_key,
+                                                               obj.location.x,
+                                                               obj.location.y,
+                                                               obj.location.z,
+                                                               obj.rotation_euler.x,
+                                                               obj.rotation_euler.y,
+                                                               obj.rotation_euler.z,
+                                                               obj.scale.x,
+                                                               obj.scale.y,
+                                                               obj.scale.z),
+                              'UTF-8'),
+                        (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
+
+        end_time = int(round(time.time() * 1000))
+        # Sleep until it's time to send the next update
+        time.sleep(bpy.context.scene.aesel_update_rate - ((end_time-start_time) / 1000.0))
 
 # Get the scene currently selected in the scene list
 def get_selected_scene(context):
@@ -94,17 +145,27 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
     aesel_addr = StringProperty(
-            name="Aesel Address"
+            name="Aesel HTTP Address",
+            default="http://localhost:5885"
+            )
+    aesel_udp_host = StringProperty(
+            name="Aesel UDP Address",
+            default="127.0.0.1",
+            )
+    aesel_udp_port = IntProperty(
+            name="Aesel UDP Port",
+            default=5886
             )
     device_id = StringProperty(
-            name="Blender Device ID"
+            name="Blender Device ID",
+            default="my-blender-%s" % time.time()
             )
     udp_host = StringProperty(
-            name="Blender IP Address",
+            name="Blender UDP Address",
             default="127.0.0.1",
             )
     udp_port = IntProperty(
-            name="Blender IP Port",
+            name="Blender UDP Port",
             default=5838
             )
 
@@ -112,6 +173,8 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
         layout = self.layout
         layout.label(text="Blender Sync Preferences")
         layout.prop(self, "aesel_addr")
+        layout.prop(self, "aesel_udp_host")
+        layout.prop(self, "aesel_udp_port")
         layout.prop(self, "device_id")
         layout.prop(self, "udp_host")
         layout.prop(self, "udp_port")
@@ -524,7 +587,6 @@ class SendAeselUpdates(bpy.types.Operator):
         return {'FINISHED'}
 
 # Send lock requests for the active object
-# TO-DO: During call to register(), add a list we can store locked objects in for sending updates
 class LockAeselObject(bpy.types.Operator):
     bl_idname = "object.lock_aesel_object"
     bl_label = "Lock Object"
@@ -542,6 +604,8 @@ class LockAeselObject(bpy.types.Operator):
         print(r)
         response_json = r.json()
         print(response_json)
+        # Add the object to the live objects list
+        context.scene.aesel_live_objects.append((response_json['key'], obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -563,6 +627,8 @@ class UnlockAeselObject(bpy.types.Operator):
         print(r)
         response_json = r.json()
         print(response_json)
+        # Remove the ID from the live objects list
+        context.scene.aesel_live_objects.remove((response_json['key'], obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -645,6 +711,7 @@ def register():
     bpy.utils.register_class(BlenderSyncPreferences)
     bpy.utils.register_class(SceneSettingItem)
     bpy.types.Scene.aesel_current_scenes = bpy.props.CollectionProperty(type=SceneSettingItem)
+    bpy.types.Scene.aesel_live_objects = []
     bpy.types.Scene.aesel_auto_updates = bpy.props.BoolProperty(name="Sync Auto Updates", update=set_aesel_auto_update)
     bpy.types.Scene.aesel_update_rate = bpy.props.FloatProperty(name="Sync Rate", update=set_aesel_auto_update)
     bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
@@ -686,6 +753,7 @@ def unregister():
     bpy.utils.unregister_class(LockAeselObject)
     bpy.utils.unregister_class(SaveAeselObject)
     bpy.utils.unregister_class(DeleteAeselObject)
+    del bpy.types.Scene.aesel_live_objects
     del bpy.types.Scene.aesel_current_scenes
     del bpy.types.Scene.aesel_auto_updates
     del bpy.types.Scene.aesel_update_rate
