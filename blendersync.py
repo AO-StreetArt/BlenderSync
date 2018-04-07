@@ -42,25 +42,45 @@ import threading
 import os
 from datetime import datetime
 import time
+import copy
 
 # TO-DO: Handle Objects with multiple mesh assets
 # TO-DO: Handle Objects with different kinds of assets (some shader-based asset type, also fbx for armatures)
 # TO-DO: Add Primitive Support
-# TO-DO: UI is only active when an object is selected, should be all the time
+# TO-DO: Handle special case when imported object has same name as existing object
 auto_updates_active = False
 
 # Callback for auto updates
 def set_aesel_auto_update(self, context):
-    if not bpy.context.scene.aesel_auto_updates:
-        auto_updates_active = True
+    if not context.scene.aesel_updates_live:
+        context.scene.aesel_updates_live = True
         send_thread = threading.Thread(target=send_object_updates, args=())
         send_thread.daemon = True
         send_thread.start()
+    else:
+        bpy.context.scene.aesel_updates_live = False
+
+def set_aesel_listen(self, context):
+    if not bpy.context.scene.aesel_listen_live:
+        bpy.context.scene.aesel_listen_live = True
         recv_thread = threading.Thread(target=listen_for_object_updates, args=())
         recv_thread.daemon = True
         recv_thread.start()
     else:
-        auto_updates_active = False
+        bpy.context.scene.aesel_listen_live = False
+
+def gen_url(scene_name=None, object_name=None, asset_id=None):
+    addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
+    url_str = addon_prefs.aesel_addr + '/v1'
+    if asset_id is not None:
+        url_str += "/asset/" + asset_id
+    else:
+        if scene_name is not None:
+            url_str += "/scene/" + scene_name
+        if object_name is not None:
+            url_str += "/object/" + object_name
+    print("Executing HTTP Request to URL %s" % url_str)
+    return url_str
 
 # Save an asset
 def save_asset(context):
@@ -75,21 +95,21 @@ def save_asset(context):
 
     # Post the file as form data to Aesel
     file_data = {'file': open(target_file, 'rb')}
-    addon_prefs = context.user_preferences.addons[__name__].preferences
-    r = requests.post(addon_prefs.aesel_addr + '/v1/asset/', files=file_data)
+    r = requests.post(gen_url(asset_id=''), files=file_data)
     print(r)
     print(r.text)
     return [r.text]
 
 # Listen for updates from Aesel
 def listen_for_object_updates():
+    print('Opening UDP Port')
     # Create a TCP/IP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Bind the socket to the port
     server_address = ('localhost', 10000)
     sock.bind(server_address)
-    while(bpy.context.scene.aesel_auto_updates):
+    while(bpy.context.scene.aesel_listen_live):
         # Recieve a message from Aesel
         data, address = sock.recvfrom(8192)
         if data:
@@ -100,39 +120,44 @@ def listen_for_object_updates():
                                                 (transform[4], transform[5], transform[6], transform[7]),
                                                 (transform[8], transform[9], transform[10], transform[11]),
                                                 (transform[12], transform[13], transform[14], transform[15]))
-
+    print("Not listening on UDP port anymore")
 
 # Send updates to Aesel for all locked objects
 def send_object_updates():
-    global auto_updates_active
-    addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
+    print("Starting to send UDP Updates to Aesel")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    while(bpy.context.scene.aesel_auto_updates):
-        for elt in bpy.context.scene.aesel_live_objects:
-            start_time = int(round(time.time() * 1000))
-            aesel_key = elt[0]
-            object_name = elt[1]
-            obj = bpy.data.objects[object_name]
-            # Send the actual message
-            sock.sendto(bytes("""{"key": "%s",
-                                  "translation": [%s, %s, %s],
-                                  "euler_rotation": [%s, %s, %s],
-                                  "scale": [%s, %s, %s]}""" % (aesel_key,
-                                                               obj.location.x,
-                                                               obj.location.y,
-                                                               obj.location.z,
-                                                               obj.rotation_euler.x,
-                                                               obj.rotation_euler.y,
-                                                               obj.rotation_euler.z,
-                                                               obj.scale.x,
-                                                               obj.scale.y,
-                                                               obj.scale.z),
-                              'UTF-8'),
-                        (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
-
+    while(bpy.context.scene.aesel_updates_live):
+        start_time = int(round(time.time() * 1000))
+        send_object_update(sock)
         end_time = int(round(time.time() * 1000))
         # Sleep until it's time to send the next update
         time.sleep(bpy.context.scene.aesel_update_rate - ((end_time-start_time) / 1000.0))
+    print("No longer sending UDP updates to Aesel")
+
+def send_object_update(inp_socket):
+    addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
+    for elt in bpy.context.scene.aesel_live_objects:
+        start_time = int(round(time.time() * 1000))
+        aesel_key = elt[0]
+        object_name = elt[1]
+        obj = bpy.data.objects[object_name]
+        print("Sending UDP update for object %s" % object_name)
+        # Send the actual message
+        inp_socket.sendto(bytes("""{"key": "%s",
+                              "translation": [%s, %s, %s],
+                              "euler_rotation": [%s, %s, %s],
+                              "scale": [%s, %s, %s]}""" % (aesel_key,
+                                                           obj.location.x,
+                                                           obj.location.y,
+                                                           obj.location.z,
+                                                           obj.rotation_euler.x,
+                                                           obj.rotation_euler.y,
+                                                           obj.rotation_euler.z,
+                                                           obj.scale.x,
+                                                           obj.scale.y,
+                                                           obj.scale.z),
+                          'UTF-8'),
+                    (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
 
 # Get the scene currently selected in the scene list
 def get_selected_scene(context):
@@ -166,7 +191,7 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
             )
     udp_port = IntProperty(
             name="Blender UDP Port",
-            default=5838
+            default=6345
             )
 
     def draw(self, context):
@@ -190,10 +215,6 @@ class BlenderSyncPanel(bpy.types.Panel):
     bl_region_type = 'TOOLS'
     bl_category = 'Tools'
 
-    @classmethod
-    def poll(cls, context):
-        return context.object
-
     def draw(self, context):
         layout = self.layout
         row = layout.row()
@@ -215,10 +236,6 @@ class AeselScenePanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = 'Tools'
-
-    @classmethod
-    def poll(cls, context):
-        return context.object
 
     def draw(self, context):
         layout = self.layout
@@ -246,10 +263,6 @@ class AeselObjectPanel(bpy.types.Panel):
     bl_region_type = 'TOOLS'
     bl_category = 'Tools'
 
-    @classmethod
-    def poll(cls, context):
-        return context.object
-
     def draw(self, context):
         layout = self.layout
         row = layout.row()
@@ -262,6 +275,8 @@ class AeselObjectPanel(bpy.types.Panel):
         row.operator("object.send_aesel_updates")
         row = layout.row()
         row.prop(context.scene, 'aesel_auto_updates')
+        row.prop(context.scene, 'aesel_listen_for_updates')
+        row = layout.row()
         row.prop(context.scene, 'aesel_update_rate')
 
 # Operators
@@ -332,8 +347,7 @@ class AddAeselScene(bpy.types.Operator):
             query_map['longitude'] = self.scene_lon
 
         # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + self.scene_name, json=query_map)
+        r = requests.post(gen_url(scene_name=self.scene_name), json=query_map)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -357,8 +371,7 @@ class DeleteAeselScene(bpy.types.Operator):
 
         # execute a request to Aesel
         selected_name = get_selected_scene(context)
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name)
+        r = requests.delete(gen_url(scene_name=selected_name))
 
         # Parse response JSON
         print(r)
@@ -395,8 +408,7 @@ class FindAeselScenes(bpy.types.Operator):
             query_map['longitude'] = self.scene_lon
 
         # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/data', json=query_map)
+        r = requests.post(gen_url(scene_name='') + '/data', json=query_map)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -444,8 +456,7 @@ class UpdateAeselScene(bpy.types.Operator):
             query_map['longitude'] = self.scene_lon
 
         # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name, json=query_map)
+        r = requests.post(gen_url(scene_name=selected_name), json=query_map)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -471,20 +482,20 @@ class RegisterAeselDevice(bpy.types.Operator):
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'device_id': addon_prefs.device_id, 'device_host': addon_prefs.udp_host, 'device_port': addon_prefs.udp_port}
-        r = requests.put(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + '/registration', params=payload)
+        r = requests.put(gen_url(scene_name=selected_name) + '/registration', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
         print(response_json)
 
         # Get the Scene
-        scene_response = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name)
+        scene_response = requests.get(gen_url(scene_name=selected_name))
         scene_response_json = scene_response.json()
         print(scene_response_json)
 
         # Download Scene Assets
         for asset in scene_response_json['assets']:
-            r = requests.get(addon_prefs.aesel_addr + '/v1/asset/' + asset, allow_redirects=True)
+            r = requests.get(gen_url(asset_id=asset), allow_redirects=True)
             filename = 'asset-%s' % asset
             with open(filename, 'wb') as asset_file:
                 asset_file.write(r.content)
@@ -495,14 +506,14 @@ class RegisterAeselDevice(bpy.types.Operator):
             print('Imported Name %s' % imported_blender_object.name)
 
         # Download Objects
-        object_response = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + '/object')
+        object_response = requests.get(gen_url(scene_name=selected_name) + '/object')
         object_response_json = object_response.json()
         print(object_response_json)
         for record in object_response_json['objects']:
 
             # Download Object Assets
             for asset in record['assets']:
-                r = requests.get(addon_prefs.aesel_addr + '/v1/asset/' + asset, allow_redirects=True)
+                r = requests.get(gen_url(asset_id=asset), allow_redirects=True)
                 filename = 'asset-%s' % asset
                 with open(filename, 'wb') as asset_file:
                     asset_file.write(r.content)
@@ -543,8 +554,7 @@ class SaveSceneAssets(bpy.types.Operator):
         query_map = {'assets': id_list}
 
         # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name, json=query_map)
+        r = requests.post(gen_url(scene_name=selected_name), json=query_map)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -566,7 +576,7 @@ class DeregisterAeselDevice(bpy.types.Operator):
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'device_id': addon_prefs.device_id}
-        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + 'registration', params=payload)
+        r = requests.delete(gen_url(scene_name=selected_name) + '/registration', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -582,7 +592,8 @@ class SendAeselUpdates(bpy.types.Operator):
 
     # Called when operator is run
     def execute(self, context):
-        send_object_updates()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        send_object_update(sock)
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -599,7 +610,7 @@ class LockAeselObject(bpy.types.Operator):
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'owner': addon_prefs.device_id}
-        r = requests.get(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/lock', params=payload)
+        r = requests.get(gen_url(scene_name=selected_name, object_name=obj.name) + '/lock', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -622,7 +633,7 @@ class UnlockAeselObject(bpy.types.Operator):
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
         payload = {'owner': addon_prefs.device_id}
-        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name + '/lock', params=payload)
+        r = requests.delete(gen_url(scene_name=selected_name, object_name=obj.name) + '/lock', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -643,32 +654,53 @@ class SaveAeselObject(bpy.types.Operator):
         selected_name = get_selected_scene(context)
         obj = bpy.context.active_object
         # Save Object Assets
+        # First, we need to save the current rotation, and move the object
+        # to (0,0,0) so that it exports correctly
+        current_location = [copy.deepcopy(obj.location.x),
+                            copy.deepcopy(obj.location.y),
+                            copy.deepcopy(obj.location.z)]
+        current_rotation = [copy.deepcopy(obj.rotation_euler.x),
+                            copy.deepcopy(obj.rotation_euler.y),
+                            copy.deepcopy(obj.rotation_euler.z)]
+        current_scale = [copy.deepcopy(obj.scale.x),
+                            copy.deepcopy(obj.scale.y),
+                            copy.deepcopy(obj.scale.z)]
+        obj.location.x = 0.0
+        obj.location.y = 0.0
+        obj.location.z = 0.0
+        obj.rotation_euler.x = 0.0
+        obj.rotation_euler.y = 0.0
+        obj.rotation_euler.z = 0.0
+        obj.scale.x = 1.0
+        obj.scale.y = 1.0
+        obj.scale.z = 1.0
         id_list = save_asset(context)
+        # Move the object back
+        obj.location.x = current_location[0]
+        obj.location.y = current_location[1]
+        obj.location.z = current_location[2]
+        obj.rotation_euler.x = current_rotation[0]
+        obj.rotation_euler.y = current_rotation[1]
+        obj.rotation_euler.z = current_rotation[2]
+        obj.scale.x = current_scale[0]
+        obj.scale.y = current_scale[1]
+        obj.scale.z = current_scale[2]
         # Save Asset ID into custom property on object
         bpy.context.active_object['asset'] = id_list[0]
         # Build an Adrestia Object
-        # Currently only tracking global x rotation, current design is going to force
-        # some additional math to include everything else (See Issue #37 in Adrestia)
         obj_json = {
                     "name": obj.name,
                     "type": "mesh",
                     "subtype": "custom",
                     "owner": "",
-                    "translation": [obj.location.x,
-                                    obj.location.y,
-                                    obj.location.z],
-                    "euler_rotation": [obj.rotation_euler.x,
-                                       obj.rotation_euler.y,
-                                       obj.rotation_euler.z],
-                    "scale": [obj.scale.x,
-                              obj.scale.y,
-                              obj.scale.z],
+                    "translation": current_location,
+                    "euler_rotation": current_rotation,
+                    "scale": current_scale,
                     "assets": id_list
                     }
 
         # execute a request to Aesel
-        addon_prefs = context.user_preferences.addons[__name__].preferences
-        r = requests.post(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + obj.name, json=obj_json)
+        r = requests.post(gen_url(scene_name=selected_name, object_name=obj.name), json=obj_json)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -687,15 +719,14 @@ class DeleteAeselObject(bpy.types.Operator):
     def execute(self, context):
 
         selected_name = get_selected_scene(context)
-        addon_prefs = context.user_preferences.addons[__name__].preferences
 
         # Delete the object assets
         if 'asset' in bpy.context.active_object:
-            r = requests.delete(addon_prefs.aesel_addr + '/v1/asset/' + bpy.context.active_object['asset'])
+            r = requests.delete(gen_url(asset_id=bpy.context.active_object['asset']))
             print(r)
 
         # Delete the object from aesel
-        r = requests.delete(addon_prefs.aesel_addr + '/v1/scene/' + selected_name + "/object/" + bpy.context.active_object.name)
+        r = requests.delete(gen_url(scene_name=selected_name, object_name=bpy.context.active_object.name))
         print(r)
 
         # Delete the object from blender
@@ -712,8 +743,11 @@ def register():
     bpy.utils.register_class(SceneSettingItem)
     bpy.types.Scene.aesel_current_scenes = bpy.props.CollectionProperty(type=SceneSettingItem)
     bpy.types.Scene.aesel_live_objects = []
+    bpy.types.Scene.aesel_updates_live = bpy.props.BoolProperty()
+    bpy.types.Scene.aesel_listen_live = bpy.props.BoolProperty()
     bpy.types.Scene.aesel_auto_updates = bpy.props.BoolProperty(name="Sync Auto Updates", update=set_aesel_auto_update)
-    bpy.types.Scene.aesel_update_rate = bpy.props.FloatProperty(name="Sync Rate", update=set_aesel_auto_update)
+    bpy.types.Scene.aesel_listen_for_updates = bpy.props.BoolProperty(name="Listen for Updates", update=set_aesel_listen)
+    bpy.types.Scene.aesel_update_rate = bpy.props.FloatProperty(name="Sync Rate", default=1.0)
     bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
     bpy.utils.register_class(DeleteAeselObject)
     bpy.utils.register_class(SaveAeselObject)
@@ -758,6 +792,8 @@ def unregister():
     del bpy.types.Scene.aesel_auto_updates
     del bpy.types.Scene.aesel_update_rate
     del bpy.types.Scene.list_index
+    del bpy.types.Scene.aesel_updates_live
+    del bpy.types.Scene.aesel_listen_live
     bpy.utils.unregister_class(SceneSettingItem)
     bpy.utils.unregister_class(BlenderSyncPreferences)
 
