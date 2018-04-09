@@ -43,6 +43,7 @@ import os
 from datetime import datetime
 import time
 import copy
+import json
 
 # TO-DO: Handle Objects with multiple mesh assets
 # TO-DO: Handle Objects with different kinds of assets (some shader-based asset type, also fbx for armatures)
@@ -102,24 +103,28 @@ def save_asset(context):
 
 # Listen for updates from Aesel
 def listen_for_object_updates():
-    print('Opening UDP Port')
+    addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
+    server_address = (addon_prefs.udp_host, addon_prefs.udp_port)
+    print('Opening UDP Port: %s :: %s' % server_address)
     # Create a TCP/IP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Bind the socket to the port
-    server_address = ('localhost', 10000)
     sock.bind(server_address)
     while(bpy.context.scene.aesel_listen_live):
         # Recieve a message from Aesel
         data, address = sock.recvfrom(8192)
+        print(data)
         if data:
-            data_dict = json.loads(data.decode("utf-8"))
+            data_str = data.decode("utf-8")
+            print("Recieved data %s" % data_str)
+            data_dict = json.loads(data_str)
             obj = bpy.data.objects[data_dict['name']]
             transform = data_dict['transform']
-            obj.matrix_world = mathutils.Matrix((transform[0], transform[1], transform[2], transform[3]),
-                                                (transform[4], transform[5], transform[6], transform[7]),
-                                                (transform[8], transform[9], transform[10], transform[11]),
-                                                (transform[12], transform[13], transform[14], transform[15]))
+            obj.matrix_world = mathutils.Matrix(([transform[0], transform[1], transform[2], transform[3]],
+                                                [transform[4], transform[5], transform[6], transform[7]],
+                                                [transform[8], transform[9], transform[10], transform[11]],
+                                                [transform[12], transform[13], transform[14], transform[15]]))
     print("Not listening on UDP port anymore")
 
 # Send updates to Aesel for all locked objects
@@ -144,20 +149,24 @@ def send_object_update(inp_socket):
         print("Sending UDP update for object %s" % object_name)
         # Send the actual message
         inp_socket.sendto(bytes("""{"key": "%s",
-                              "translation": [%s, %s, %s],
-                              "euler_rotation": [%s, %s, %s],
-                              "scale": [%s, %s, %s]}""" % (aesel_key,
-                                                           obj.location.x,
-                                                           obj.location.y,
-                                                           obj.location.z,
-                                                           obj.rotation_euler.x,
-                                                           obj.rotation_euler.y,
-                                                           obj.rotation_euler.z,
-                                                           obj.scale.x,
-                                                           obj.scale.y,
-                                                           obj.scale.z),
-                          'UTF-8'),
-                    (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
+                                    "name": "%s",
+                                    "scene": "%s",
+                                    "translation": [%.4f, %.4f, %.4f],
+                                    "euler_rotation": [%.4f, %.4f, %.4f],
+                                    "scale": [%.4f, %.4f, %.4f]}""" % (aesel_key,
+                                                                 object_name,
+                                                                 bpy.context.scene.current_scene_id,
+                                                                 obj.location.x,
+                                                                 obj.location.y,
+                                                                 obj.location.z,
+                                                                 obj.rotation_euler.x,
+                                                                 obj.rotation_euler.y,
+                                                                 obj.rotation_euler.z,
+                                                                 obj.scale.x,
+                                                                 obj.scale.y,
+                                                                 obj.scale.z),
+                                'UTF-8'),
+                        (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
 
 # Get the scene currently selected in the scene list
 def get_selected_scene(context):
@@ -186,7 +195,11 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
             default="my-blender-%s" % time.time()
             )
     udp_host = StringProperty(
-            name="Blender UDP Address",
+            name="Bound Blender UDP Address",
+            default="127.0.0.1",
+            )
+    advertised_udp_host = StringProperty(
+            name="Advertised Blender UDP Address",
             default="127.0.0.1",
             )
     udp_port = IntProperty(
@@ -201,6 +214,7 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "aesel_udp_host")
         layout.prop(self, "aesel_udp_port")
         layout.prop(self, "device_id")
+        layout.prop(self, "advertised_udp_host")
         layout.prop(self, "udp_host")
         layout.prop(self, "udp_port")
 
@@ -481,7 +495,7 @@ class RegisterAeselDevice(bpy.types.Operator):
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'device_id': addon_prefs.device_id, 'device_host': addon_prefs.udp_host, 'device_port': addon_prefs.udp_port}
+        payload = {'device_id': addon_prefs.device_id, 'device_host': addon_prefs.advertised_udp_host, 'device_port': addon_prefs.udp_port}
         r = requests.put(gen_url(scene_name=selected_name) + '/registration', params=payload)
         # Parse response JSON
         print(r)
@@ -492,6 +506,7 @@ class RegisterAeselDevice(bpy.types.Operator):
         scene_response = requests.get(gen_url(scene_name=selected_name))
         scene_response_json = scene_response.json()
         print(scene_response_json)
+        context.scene.current_scene_id = scene_response_json['key']
 
         # Download Scene Assets
         for asset in scene_response_json['assets']:
@@ -749,6 +764,7 @@ def register():
     bpy.types.Scene.aesel_listen_for_updates = bpy.props.BoolProperty(name="Listen for Updates", update=set_aesel_listen)
     bpy.types.Scene.aesel_update_rate = bpy.props.FloatProperty(name="Sync Rate", default=1.0)
     bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
+    bpy.types.Scene.current_scene_id = bpy.props.StringProperty(name = "Current Scene ID", default="")
     bpy.utils.register_class(DeleteAeselObject)
     bpy.utils.register_class(SaveAeselObject)
     bpy.utils.register_class(LockAeselObject)
@@ -794,6 +810,7 @@ def unregister():
     del bpy.types.Scene.list_index
     del bpy.types.Scene.aesel_updates_live
     del bpy.types.Scene.aesel_listen_live
+    del bpy.types.Scene.current_scene_id
     bpy.utils.unregister_class(SceneSettingItem)
     bpy.utils.unregister_class(BlenderSyncPreferences)
 
