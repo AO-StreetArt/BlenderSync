@@ -1,0 +1,17 @@
+language: python
+python:
+  - "2.7"
+addons:
+  apt:
+    sources:
+    packages:
+      - blender
+before_install:
+  - blender -v
+install:
+  - echo $TRAVIS_BUILD_DIR
+  - tests/scripts/install_blender.sh $TRAVIS_BUILD_DIR
+  - source .envs
+  - sudo ln -s $TRAVIS_BUILD_DIR/BlenderSync $BLENDER_FOLDER/2.79/scripts/addons/BlenderSync
+script:
+  - python tests.py $BLENDER_FOLDER/blender $TRAVIS_BUILD_DIR
