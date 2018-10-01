@@ -148,29 +148,31 @@ def send_object_update(inp_socket):
         obj = bpy.data.objects[object_name]
         print("Sending UDP update for object %s" % object_name)
         # Send the actual message
-        inp_socket.sendto(bytes("""{"key": "%s",
-                                    "name": "%s",
-                                    "scene": "%s",
-                                    "translation": [%.4f, %.4f, %.4f],
-                                    "euler_rotation": [%.4f, %.4f, %.4f],
-                                    "scale": [%.4f, %.4f, %.4f]}""" % (aesel_key,
+        inp_socket.sendto(bytes("""{"msg_type":1,"key":"%s","name":"%s","scene":"%s","transform":[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f]}""" % (aesel_key,
                                                                  object_name,
                                                                  bpy.context.scene.current_scene_id,
-                                                                 obj.location.x,
-                                                                 obj.location.y,
-                                                                 obj.location.z,
-                                                                 obj.rotation_euler.x,
-                                                                 obj.rotation_euler.y,
-                                                                 obj.rotation_euler.z,
-                                                                 obj.scale.x,
-                                                                 obj.scale.y,
-                                                                 obj.scale.z),
+                                                                 obj.matrix_world[0][0],
+                                                                 obj.matrix_world[0][1],
+                                                                 obj.matrix_world[0][2],
+                                                                 obj.matrix_world[0][3],
+                                                                 obj.matrix_world[1][0],
+                                                                 obj.matrix_world[1][1],
+                                                                 obj.matrix_world[1][2],
+                                                                 obj.matrix_world[1][3],
+                                                                 obj.matrix_world[2][0],
+                                                                 obj.matrix_world[2][1],
+                                                                 obj.matrix_world[2][2],
+                                                                 obj.matrix_world[2][3],
+                                                                 obj.matrix_world[3][0],
+                                                                 obj.matrix_world[3][1],
+                                                                 obj.matrix_world[3][2],
+                                                                 obj.matrix_world[3][3]),
                                 'UTF-8'),
                         (addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port))
 
 # Get the scene currently selected in the scene list
 def get_selected_scene(context):
-    return context.scene.aesel_current_scenes[context.scene.list_index].name
+    return context.scene.aesel_current_scenes[context.scene.list_index].key
 
 # Global Addon Properties
 class BlenderSyncPreferences(bpy.types.AddonPreferences):
@@ -180,7 +182,7 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
 
     aesel_addr = StringProperty(
             name="Aesel HTTP Address",
-            default="http://localhost:5885"
+            default="http://localhost:8080"
             )
     aesel_udp_host = StringProperty(
             name="Aesel UDP Address",
@@ -188,7 +190,7 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
             )
     aesel_udp_port = IntProperty(
             name="Aesel UDP Port",
-            default=5886
+            default=8762
             )
     device_id = StringProperty(
             name="Blender Device ID",
@@ -240,6 +242,7 @@ class Scene_List(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         if self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
+        layout.label(item.key)
         layout.label(item.name)
 
 # Scene Panel
@@ -341,6 +344,7 @@ class AddAeselScene(bpy.types.Operator):
     bl_idname = "object.add_aesel_scene"
     bl_label = "Create Scene"
     bl_options = {'REGISTER'}
+    scene_key = bpy.props.StringProperty(name="Scene Key", default="First")
     scene_name = bpy.props.StringProperty(name="Scene Name", default="Default")
     scene_region = bpy.props.StringProperty(name="Scene Region", default="")
     scene_tag = bpy.props.StringProperty(name="Scene Tags", default="")
@@ -351,6 +355,8 @@ class AddAeselScene(bpy.types.Operator):
     def execute(self, context):
         # Build an Adrestia Query Map
         query_map = {}
+        if self.scene_name != "":
+            query_map['name'] = self.scene_name
         if self.scene_region != "":
             query_map['region'] = self.scene_region
         if self.scene_tag != "":
@@ -360,8 +366,14 @@ class AddAeselScene(bpy.types.Operator):
         if self.scene_lon > -9998.0:
             query_map['longitude'] = self.scene_lon
 
+        scene_msg = {
+                        "scenes": [
+                            query_map
+                        ]
+                    }
+
         # execute a request to Aesel
-        r = requests.post(gen_url(scene_name=self.scene_name), json=query_map)
+        r = requests.put(gen_url(scene_name=self.scene_key), json=scene_msg)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -413,16 +425,17 @@ class FindAeselScenes(bpy.types.Operator):
         if self.scene_name != "":
             query_map['name'] = self.scene_name
         if self.scene_region != "":
-            query_map['name'] = self.scene_region
+            query_map['region'] = self.scene_region
         if self.scene_tag != "":
             query_map['tags'] = self.scene_tag.split(",")
         if self.scene_lat > -9998.0:
             query_map['latitude'] = self.scene_lat
         if self.scene_lon > -9998.0:
             query_map['longitude'] = self.scene_lon
+        query_msg = {"scenes": [query_map]}
 
         # execute a request to Aesel
-        r = requests.post(gen_url(scene_name='') + '/data', json=query_map)
+        r = requests.post(gen_url(scene_name='query'), json=query_msg)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -433,6 +446,7 @@ class FindAeselScenes(bpy.types.Operator):
             # Populate the Scene List in the UI
             new_item = context.scene.aesel_current_scenes.add()
             new_item.name = scene['name']
+            new_item.key = scene['key']
             print(scene)
 
         # Let's blender know the operator is finished
@@ -468,9 +482,10 @@ class UpdateAeselScene(bpy.types.Operator):
             query_map['latitude'] = self.scene_lat
         if self.scene_lon > -9998.0:
             query_map['longitude'] = self.scene_lon
+        query_msg = {"scenes": [query_map]}
 
         # execute a request to Aesel
-        r = requests.post(gen_url(scene_name=selected_name), json=query_map)
+        r = requests.post(gen_url(scene_name=selected_name), json=query_msg)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -495,21 +510,42 @@ class RegisterAeselDevice(bpy.types.Operator):
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'device_id': addon_prefs.device_id, 'device_host': addon_prefs.advertised_udp_host, 'device_port': addon_prefs.udp_port}
-        r = requests.put(gen_url(scene_name=selected_name) + '/registration', params=payload)
+        payload = {
+                    "scenes": [
+                        {
+                            "key": selected_name,
+                            "devices": [
+                                {
+                                    "key": addon_prefs.device_id,
+                                    "hostname": addon_prefs.advertised_udp_host,
+                                    "port": addon_prefs.udp_port
+                                }
+                            ]
+                        }
+                    ]
+                }
+        r = requests.post(gen_url(scene_name=selected_name) + '/register', json=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
         print(response_json)
 
         # Get the Scene
-        scene_response = requests.get(gen_url(scene_name=selected_name))
+        payload = {
+                    "scenes": [
+                        {
+                            "key": "%s" % selected_name
+                        }
+                    ]
+                }
+        scene_response = requests.post(gen_url(scene_name='query'), json=payload)
+        print(scene_response)
         scene_response_json = scene_response.json()
         print(scene_response_json)
-        context.scene.current_scene_id = scene_response_json['key']
+        context.scene.current_scene_id = scene_response_json['scenes'][0]['key']
 
         # Download Scene Assets
-        for asset in scene_response_json['assets']:
+        for asset in scene_response_json['scenes'][0]['assets']:
             r = requests.get(gen_url(asset_id=asset), allow_redirects=True)
             filename = 'asset-%s' % asset
             with open(filename, 'wb') as asset_file:
@@ -521,7 +557,15 @@ class RegisterAeselDevice(bpy.types.Operator):
             print('Imported Name %s' % imported_blender_object.name)
 
         # Download Objects
-        object_response = requests.get(gen_url(scene_name=selected_name) + '/object')
+        obj_query_payload = {
+                                "num_records": 100,
+                                "objects": [
+                                    {
+                                        "scene": selected_name
+                                    }
+                                ]
+                            }
+        object_response = requests.post(gen_url(scene_name=selected_name, object_name='query'), json=obj_query_payload)
         object_response_json = object_response.json()
         print(object_response_json)
         for record in object_response_json['objects']:
@@ -566,7 +610,13 @@ class SaveSceneAssets(bpy.types.Operator):
         # Update the scene with the new Asset ID's
         selected_name = get_selected_scene(context)
         # Build an Adrestia Query Map
-        query_map = {'assets': id_list}
+        query_map = {
+                        'scenes': [
+                            {
+                                'assets': id_list
+                            }
+                        ]
+                    }
 
         # execute a request to Aesel
         r = requests.post(gen_url(scene_name=selected_name), json=query_map)
@@ -590,8 +640,19 @@ class DeregisterAeselDevice(bpy.types.Operator):
 
         # execute a request to Aesel
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'device_id': addon_prefs.device_id}
-        r = requests.delete(gen_url(scene_name=selected_name) + '/registration', params=payload)
+        payload = {
+                    "scenes": [
+                        {
+                            "key": selected_name,
+                            "devices": [
+                                {
+                                    "key": addon_prefs.device_id
+                                }
+                            ]
+                        }
+                    ]
+                }
+        r = requests.post(gen_url(scene_name=selected_name) + '/deregister', json=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
@@ -624,14 +685,14 @@ class LockAeselObject(bpy.types.Operator):
         obj = bpy.context.active_object
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'owner': addon_prefs.device_id}
-        r = requests.get(gen_url(scene_name=selected_name, object_name=obj.name) + '/lock', params=payload)
+        payload = {'device': addon_prefs.device_id}
+        r = requests.get(gen_url(scene_name=selected_name, object_name=context.scene.aesel_objects[obj.name]) + '/lock', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
         print(response_json)
         # Add the object to the live objects list
-        context.scene.aesel_live_objects.append((response_json['key'], obj.name))
+        context.scene.aesel_live_objects.append((context.scene.aesel_objects[obj.name], obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -647,14 +708,14 @@ class UnlockAeselObject(bpy.types.Operator):
         obj = bpy.context.active_object
         # Execute the request
         addon_prefs = context.user_preferences.addons[__name__].preferences
-        payload = {'owner': addon_prefs.device_id}
-        r = requests.delete(gen_url(scene_name=selected_name, object_name=obj.name) + '/lock', params=payload)
+        payload = {'device': addon_prefs.device_id}
+        r = requests.delete(gen_url(scene_name=selected_name, object_name=context.scene.aesel_objects[obj.name]) + '/lock', params=payload)
         # Parse response JSON
         print(r)
         response_json = r.json()
         print(response_json)
         # Remove the ID from the live objects list
-        context.scene.aesel_live_objects.remove((response_json['key'], obj.name))
+        context.scene.aesel_live_objects.remove((context.scene.aesel_objects[obj.name], obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -704,22 +765,29 @@ class SaveAeselObject(bpy.types.Operator):
         bpy.context.active_object['asset'] = id_list[0]
         # Build an Adrestia Object
         obj_json = {
-                    "name": obj.name,
-                    "type": "mesh",
-                    "subtype": "custom",
-                    "owner": "",
-                    "translation": current_location,
-                    "euler_rotation": current_rotation,
-                    "scale": current_scale,
-                    "assets": id_list
+                        "objects": [
+                            {
+                                "name": obj.name,
+                                "type": "mesh",
+                                "scene": "%s" % selected_name,
+                                "subtype": "custom",
+                                "owner": "",
+                                "translation": current_location,
+                                "euler_rotation": current_rotation,
+                                "scale": current_scale,
+                                "assets": id_list
+                            }
+                        ]
                     }
 
         # execute a request to Aesel
-        r = requests.post(gen_url(scene_name=selected_name, object_name=obj.name), json=obj_json)
+        r = requests.post(gen_url(scene_name=selected_name, object_name=""), json=obj_json)
         # Parse response JSON
         print(r)
         response_json = r.json()
         print(response_json)
+        # Add the key from the response into the object list
+        bpy.types.Scene.aesel_objects[obj.name] = response_json['objects'][0]['key']
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
@@ -741,7 +809,10 @@ class DeleteAeselObject(bpy.types.Operator):
             print(r)
 
         # Delete the object from aesel
-        r = requests.delete(gen_url(scene_name=selected_name, object_name=bpy.context.active_object.name))
+        for elt in context.scene.aesel_live_objects:
+            if elt[1] == bpy.context.active_object.name:
+                r = requests.delete(gen_url(scene_name=selected_name, object_name=elt[0]))
+
         print(r)
 
         # Delete the object from blender
@@ -752,11 +823,13 @@ class DeleteAeselObject(bpy.types.Operator):
 
 class SceneSettingItem(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty(name="Scene Name", default="test")
+    key = bpy.props.StringProperty(name="Scene Key", default="key")
 
 def register():
     bpy.utils.register_class(BlenderSyncPreferences)
     bpy.utils.register_class(SceneSettingItem)
     bpy.types.Scene.aesel_current_scenes = bpy.props.CollectionProperty(type=SceneSettingItem)
+    bpy.types.Scene.aesel_objects = {}
     bpy.types.Scene.aesel_live_objects = []
     bpy.types.Scene.aesel_updates_live = bpy.props.BoolProperty()
     bpy.types.Scene.aesel_listen_live = bpy.props.BoolProperty()
@@ -804,6 +877,7 @@ def unregister():
     bpy.utils.unregister_class(SaveAeselObject)
     bpy.utils.unregister_class(DeleteAeselObject)
     del bpy.types.Scene.aesel_live_objects
+    del bpy.types.Scene.aesel_objects
     del bpy.types.Scene.aesel_current_scenes
     del bpy.types.Scene.aesel_auto_updates
     del bpy.types.Scene.aesel_update_rate
