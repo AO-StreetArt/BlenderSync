@@ -156,6 +156,10 @@ class BlenderSyncPreferences(bpy.types.AddonPreferences):
         layout.operator("object.update_aesel_cookie")
         layout.operator("object.save_bsync_prefs")
 
+class SceneSettingItem(bpy.types.PropertyGroup):
+    name = bpy.props.StringProperty(name="Scene Name", default="test")
+    key = bpy.props.StringProperty(name="Scene Key", default="key")
+
 # register
 ##################################
 
@@ -167,6 +171,7 @@ def register():
     
     print("Registered {} with {} modules".format(bl_info["name"], len(modules)))
     
+    # Setup the Aesel clients
     addon_prefs = bpy.context.user_preferences.addons[__name__].preferences
     bpy.types.Scene.transaction_client = AeselTransactionClient(addon_prefs.aesel_addr)
     if addon_prefs.cookies_file != "":
@@ -176,11 +181,28 @@ def register():
         bpy.types.Scene.transaction_client.set_cookie_header(addon_prefs.cookie)
         print("Setting cookie")
     bpy.types.Scene.event_client = AeselEventClient(addon_prefs.aesel_udp_host, addon_prefs.aesel_udp_port)
+    
+    # Setup base properties
+    bpy.types.Scene.aesel_current_scenes = bpy.props.CollectionProperty(type=SceneSettingItem)
+    bpy.types.Scene.aesel_objects = {}
+    bpy.types.Scene.aesel_live_objects = []
+    bpy.types.Scene.aesel_listen_live = bpy.props.BoolProperty()
+    bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
+    bpy.types.Scene.current_scene_id = bpy.props.StringProperty(name = "Current Scene ID", default="")
 
 def unregister():
+    # Clear Aesel properties
+    del bpy.types.Scene.aesel_live_objects
+    del bpy.types.Scene.aesel_objects
+    del bpy.types.Scene.aesel_current_scenes
+    del bpy.types.Scene.list_index
+    del bpy.types.Scene.current_scene_id
+    
+    # Unregister modules
     try: bpy.utils.unregister_module(__name__)
     except: traceback.print_exc()
 
+    # Clear out Aesel clients
     bpy.types.Scene.transaction_client = None
     bpy.types.Scene.event_client = None
     print("Unregistered {}".format(bl_info["name"]))

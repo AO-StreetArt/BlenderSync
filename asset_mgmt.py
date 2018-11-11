@@ -3,20 +3,8 @@ import os
 from datetime import datetime
 from aesel.model.AeselAssetMetadata import AeselAssetMetadata
 
-# Create an Asset by exporting to obj
-# This should be called from the 3d view in Object mode
-class CreateObjAsset(bpy.types.Operator):
-    bl_idname = "object.create_obj_asset"
-    bl_label = "Selected to Asset"
-    bl_description = "Export selected objects to an .obj file and save this to Aesel"
-    bl_options = {"REGISTER"}
-
-    @classmethod
-    def poll(cls, context):
-        return context.object is not None
-
-    def execute(self, context):
-        # Create the Asset Metadata
+def save_selected_as_obj_asset():
+    # Create the Asset Metadata
         metadata = AeselAssetMetadata()
         metadata.asset_type = ""
         metadata.content_type = "text/plain"
@@ -32,9 +20,27 @@ class CreateObjAsset(bpy.types.Operator):
                                  use_blen_objects=True, group_by_object=True, keep_vertex_order=True, global_scale=1)
 
         # Post the file to Aesel
-        new_key = bpy.types.Scene.transaction_client.create_asset(target_file, metadata)
+        return bpy.types.Scene.transaction_client.create_asset(target_file, metadata)
+
+# Create an Asset by exporting to obj
+# This should be called from the 3d view in Object mode
+class CreateObjAsset(bpy.types.Operator):
+    bl_idname = "object.create_obj_asset"
+    bl_label = "Selected to Asset"
+    bl_description = "Export selected objects to an .obj file and save this to Aesel"
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None
+
+    def execute(self, context):
+        # Post the file to Aesel
+        new_key = save_selected_as_obj_asset()
         print("Exported New Asset with Key %s" % new_key)
         return {"FINISHED"}
+    
+
 
 class AeselAssetMgmtPanel(bpy.types.Panel):
     bl_idname = "aesel_asset_mgmt_panel"
