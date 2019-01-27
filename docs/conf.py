@@ -97,9 +97,9 @@ html_theme_options = {
     # Note the "1" or "True" value above as the third argument to indicate
     # an arbitrary url.
     'navbar_links': [
-        ("Getting Started", "pages/getting_started_index"),
-        ("HTTP API", "pages/DVS_API"),
-        ("Advanced Topics", "pages/advanced_index"),
+        ("Install", "pages/install"),
+        ("Getting Started", "pages/quickstart"),
+        ("Design", "pages/design_index")
     ],
 
     # Render the next and previous page links in navbar. (Default: true)
