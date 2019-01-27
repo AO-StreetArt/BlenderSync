@@ -4,11 +4,12 @@ import copy
 from .asset_mgmt import save_selected_as_obj_asset
 from .scene_mgmt import get_selected_scene
 
+from aesel.AeselTransactionClient import AeselTransactionClient
 from aesel.model.AeselAssetRelationship import AeselAssetRelationship
 from aesel.model.AeselObject import AeselObject
 
 # Save the active object to Aesel
-class CreateAeselObject(bpy.types.Operator):
+class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
     bl_idname = "object.create_aesel_object"
     bl_label = "Save Object"
     bl_options = {'REGISTER'}
@@ -47,7 +48,7 @@ class CreateAeselObject(bpy.types.Operator):
         obj.scale.x = current_scale[0]
         obj.scale.y = current_scale[1]
         obj.scale.z = current_scale[2]
-        
+
         # Build an Aesel Object
         new_obj = AeselObject()
         new_obj.name = obj.name
@@ -60,7 +61,7 @@ class CreateAeselObject(bpy.types.Operator):
         obj_response_json = bpy.types.Scene.transaction_client.create_object(selected_key, new_obj)
         bpy.context.active_object['key'] = obj_response_json["objects"][0]["key"]
         print(obj_response_json)
-        
+
         # Post a new Asset Relationship
         new_relation = AeselAssetRelationship()
         new_relation.asset = new_key
@@ -74,7 +75,7 @@ class CreateAeselObject(bpy.types.Operator):
         return {'FINISHED'}
 
 # Delete the active object from Aesel
-class DeleteAeselObject(bpy.types.Operator):
+class OBJECT_OT_DeleteAeselObject(bpy.types.Operator):
     bl_idname = "object.delete_aesel_object"
     bl_label = "Delete Object"
     bl_options = {'REGISTER'}
@@ -83,7 +84,7 @@ class DeleteAeselObject(bpy.types.Operator):
     def execute(self, context):
         selected_key = get_selected_scene(context)
         selected_obj = bpy.context.active_object
-        
+
         # Get the assets associated to the selected object
         obj_relationship_query = AeselAssetRelationship()
         obj_relationship_query.related = selected_obj["key"]
@@ -102,9 +103,9 @@ class DeleteAeselObject(bpy.types.Operator):
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
-    
+
 # Send lock requests for the active object
-class LockAeselObject(bpy.types.Operator):
+class OBJECT_OT_LockAeselObject(bpy.types.Operator):
     bl_idname = "object.lock_aesel_object"
     bl_label = "Lock Object"
     bl_options = {'REGISTER'}
@@ -113,19 +114,19 @@ class LockAeselObject(bpy.types.Operator):
     def execute(self, context):
         selected_scene = get_selected_scene(context)
         selected_obj = bpy.context.active_object
-        device_key = context.user_preferences.addons[__name__].preferences.device_id
-        
+        device_key = context.preferences.addons[__name__].preferences.device_id
+
         # Execute the request
         response_json = bpy.types.Scene.transaction_client.lock_object(selected_scene, selected_obj["key"], device_key)
         print(response_json)
-        
+
         # Add the object to the live objects list
         context.scene.aesel_live_objects.append((context.scene.aesel_objects[obj.name], selected_obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
 # Send unlock requests for the active object
-class UnlockAeselObject(bpy.types.Operator):
+class OBJECT_OT_UnlockAeselObject(bpy.types.Operator):
     bl_idname = "object.unlock_aesel_object"
     bl_label = "Unlock Object"
     bl_options = {'REGISTER'}
@@ -134,25 +135,25 @@ class UnlockAeselObject(bpy.types.Operator):
     def execute(self, context):
         selected_scene = get_selected_scene(context)
         selected_obj = bpy.context.active_object
-        device_key = context.user_preferences.addons[__name__].preferences.device_id
-        
+        device_key = context.preferences.addons[__name__].preferences.device_id
+
         # Execute the request
         response_json = bpy.types.Scene.transaction_client.unlock_object(selected_scene, selected_obj["key"], device_key)
         print(response_json)
-        
+
         # Remove the ID from the live objects list
         context.scene.aesel_live_objects.remove((context.scene.aesel_objects[obj.name], selected_obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
 # Object Panel
-class AeselObjectPanel(bpy.types.Panel):
+class VIEW_3D_PT_AeselObjectPanel(bpy.types.Panel):
     """Creates an Aesel Object UI Panel"""
     bl_label = "Aesel Objects"
-    bl_idname = "POSE_PT_aesel_obj_ui"
+    bl_idname = "VIEW_3D_PT_aesel_obj_ui"
     bl_space_type = 'VIEW_3D'
-    bl_region_type = 'TOOLS'
-    bl_category = 'Tools'
+    bl_region_type = 'UI'
+    bl_category = 'Aesel'
 
     def draw(self, context):
         layout = self.layout
@@ -162,4 +163,6 @@ class AeselObjectPanel(bpy.types.Panel):
         row = layout.row()
         row.operator("object.lock_aesel_object")
         row.operator("object.unlock_aesel_object")
-        
+        row = layout.row()
+        row.prop(context.scene, 'aesel_auto_updates')
+        row.prop(context.scene, 'aesel_listen_for_updates')
