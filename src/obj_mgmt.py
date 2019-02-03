@@ -20,24 +20,45 @@ Created by Alex Barry
 
 import bpy
 import copy
+import threading
 
-from .asset_mgmt import save_selected_as_obj_asset
+from .bsync_utils import get_active_object
+from .asset_mgmt import save_selected_as_obj_asset, gen_asset_metadata
 from .scene_mgmt import get_selected_scene
 
 from aesel.AeselTransactionClient import AeselTransactionClient
 from aesel.model.AeselAssetRelationship import AeselAssetRelationship
 from aesel.model.AeselObject import AeselObject
 
+def _create_aesel_object(scene_key, new_obj):
+    active_obj = get_active_object(bpy.context)
+
+    # Post the Object
+    obj_response_json = bpy.types.Scene.transaction_client.create_object(scene_key, new_obj)
+    active_obj['key'] = obj_response_json["objects"][0]["key"]
+    print(obj_response_json)
+
+    # Post an Asset
+    new_asset_key = save_selected_as_obj_asset(new_obj.name, True, export_file=False)
+
+    # Post a new Asset Relationship
+    new_relation = AeselAssetRelationship()
+    new_relation.asset = new_asset_key
+    new_relation.type = "object"
+    new_relation.related = obj_response_json["objects"][0]["key"]
+    response_json = bpy.types.Scene.transaction_client.save_asset_relationship(new_relation)
+
+    print(response_json)
+
 # Save the active object to Aesel
 class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
     bl_idname = "object.create_aesel_object"
-    bl_label = "Save Object"
+    bl_label = "Save"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        selected_key = get_selected_scene(context)
-        obj = bpy.context.active_object
-        # First, we need to save the current rotation, and move the object
+        obj = get_active_object(context)
+        # First, we need to save the current transform, and move the object
         # to (0,0,0) so that it exports correctly
         current_location = [copy.deepcopy(obj.location.x),
                             copy.deepcopy(obj.location.y),
@@ -57,7 +78,7 @@ class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
         obj.scale.x = 1.0
         obj.scale.y = 1.0
         obj.scale.z = 1.0
-        new_key = save_selected_as_obj_asset()
+        save_selected_as_obj_asset(obj.name, True, post_asset=False)
         # Move the object back
         obj.location.x = current_location[0]
         obj.location.y = current_location[1]
@@ -74,95 +95,108 @@ class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
         new_obj.name = obj.name
         new_obj.type = "mesh"
         new_obj.subtype = "custom"
-        new_obj.scene = selected_key
+        new_obj.scene = context.scene.current_scene_id
         new_obj.translation = current_location
         new_obj.euler_rotation = current_rotation
         new_obj.scale = current_scale
-        obj_response_json = bpy.types.Scene.transaction_client.create_object(selected_key, new_obj)
-        bpy.context.active_object['key'] = obj_response_json["objects"][0]["key"]
-        print(obj_response_json)
 
-        # Post a new Asset Relationship
-        new_relation = AeselAssetRelationship()
-        new_relation.asset = new_key
-        new_relation.type = "object"
-        new_relation.related = obj_response_json["objects"][0]["key"]
-        response_json = bpy.types.Scene.transaction_client.save_asset_relationship(new_relation)
-
-        print(response_json)
+        # execute the object creation workflow from Aesel on a background thread
+        save_thread = threading.Thread(target=_create_aesel_object, args=(context.scene.current_scene_id, new_obj))
+        save_thread.daemon = True
+        save_thread.start()
 
         # Let's blender know the operator is finished
         return {'FINISHED'}
+
+def _delete_aesel_object(scene_key, object_key):
+    # Get the assets associated to the selected object
+    obj_relationship_query = AeselAssetRelationship()
+    obj_relationship_query.related = object_key
+    obj_relationship_query.type = "object"
+    obj_relation_result = bpy.types.Scene.transaction_client.query_asset_relationships(obj_relationship_query)
+
+    # Delete the object assets
+    for relation in obj_relation_result:
+        bpy.types.Scene.transaction_client.delete_asset(relation["assetId"])
+
+    # Delete the object from aesel
+    bpy.types.Scene.transaction_client.delete_object(scene_key, object_key)
 
 # Delete the active object from Aesel
 class OBJECT_OT_DeleteAeselObject(bpy.types.Operator):
     bl_idname = "object.delete_aesel_object"
-    bl_label = "Delete Object"
+    bl_label = "Delete"
     bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
-        selected_key = get_selected_scene(context)
-        selected_obj = bpy.context.active_object
-
-        # Get the assets associated to the selected object
-        obj_relationship_query = AeselAssetRelationship()
-        obj_relationship_query.related = selected_obj["key"]
-        obj_relationship_query.type = "object"
-        obj_relation_result = bpy.types.Scene.transaction_client.query_asset_relationships(obj_relationship_query)
-
-        # Delete the object assets
-        for relation in obj_relation_result:
-            bpy.types.Scene.transaction_client.delete_asset(relation["assetId"])
-
-        # Delete the object from aesel
-        bpy.types.Scene.transaction_client.delete_object(selected_key, selected_obj["key"])
-
         # Delete the object from blender
         bpy.ops.object.delete()
 
+        # execute the object creation workflow from Aesel on a background thread
+        save_thread = threading.Thread(target=_delete_aesel_object, args=(context.scene.current_scene_id, selected_obj["key"]))
+        save_thread.daemon = True
+        save_thread.start()
+
         # Let's blender know the operator is finished
         return {'FINISHED'}
+
+def _lock_aesel_object(scene_key, object_key, object_name, device_key):
+    # Send the Aesel request
+    response_json = bpy.types.Scene.transaction_client.lock_object(scene_key, object_key, device_key)
+    print(response_json)
+
+    # Drop a message on the queue to make the object live
+    bpy.context.scene.aesel_updates_queue.put({'type': 'lock_object',
+                                               'obj_key': object_key,
+                                               'obj_name': object_name})
 
 # Send lock requests for the active object
 class OBJECT_OT_LockAeselObject(bpy.types.Operator):
     bl_idname = "object.lock_aesel_object"
-    bl_label = "Lock Object"
+    bl_label = "Lock"
     bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
-        selected_scene = get_selected_scene(context)
-        selected_obj = bpy.context.active_object
+        selected_obj = get_active_object(context)
         device_key = context.preferences.addons[__name__].preferences.device_id
 
-        # Execute the request
-        response_json = bpy.types.Scene.transaction_client.lock_object(selected_scene, selected_obj["key"], device_key)
-        print(response_json)
+        # execute the object creation workflow from Aesel on a background thread
+        save_thread = threading.Thread(target=_lock_aesel_object, args=(context.scene.current_scene_id, selected_obj["key"], selected_obj.name, device_key))
+        save_thread.daemon = True
+        save_thread.start()
 
-        # Add the object to the live objects list
-        context.scene.aesel_live_objects.append((context.scene.aesel_objects[obj.name], selected_obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
+
+def _unlock_aesel_object(scene_key, object_key, object_name, device_key):
+    # Send the Aesel request
+    response_json = bpy.types.Scene.transaction_client.unlock_object(scene_key, object_key, device_key)
+    print(response_json)
+
+    # Drop a message on the queue to make the object live
+    bpy.context.scene.aesel_updates_queue.put({'type': 'unlock_object',
+                                               'obj_key': object_key,
+                                               'obj_name': object_name})
 
 # Send unlock requests for the active object
 class OBJECT_OT_UnlockAeselObject(bpy.types.Operator):
     bl_idname = "object.unlock_aesel_object"
-    bl_label = "Unlock Object"
+    bl_label = "Unlock"
     bl_options = {'REGISTER'}
 
     # Called when operator is run
     def execute(self, context):
         selected_scene = get_selected_scene(context)
-        selected_obj = bpy.context.active_object
+        selected_obj = get_active_object(context)
         device_key = context.preferences.addons[__name__].preferences.device_id
 
-        # Execute the request
-        response_json = bpy.types.Scene.transaction_client.unlock_object(selected_scene, selected_obj["key"], device_key)
-        print(response_json)
+        # execute the object creation workflow from Aesel on a background thread
+        save_thread = threading.Thread(target=_unlock_aesel_object, args=(context.scene.current_scene_id, selected_obj["key"], selected_obj.name, device_key))
+        save_thread.daemon = True
+        save_thread.start()
 
-        # Remove the ID from the live objects list
-        context.scene.aesel_live_objects.remove((context.scene.aesel_objects[obj.name], selected_obj.name))
         # Let's blender know the operator is finished
         return {'FINISHED'}
 
@@ -179,10 +213,13 @@ class VIEW_3D_PT_AeselObjectPanel(bpy.types.Panel):
         layout = self.layout
         row = layout.row()
         row.operator("object.create_aesel_object")
+        row = layout.row()
         row.operator("object.delete_aesel_object")
         row = layout.row()
         row.operator("object.lock_aesel_object")
+        row = layout.row()
         row.operator("object.unlock_aesel_object")
         row = layout.row()
         row.prop(context.scene, 'aesel_auto_updates')
+        row = layout.row()
         row.prop(context.scene, 'aesel_listen_for_updates')
