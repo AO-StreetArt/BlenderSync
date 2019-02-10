@@ -18,26 +18,17 @@ Created by Alex Barry
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import os
+import bpy
 
-# Get the root file path for assets
-def get_assets_file_path(current_scene_name, executable_folder, base_folder):
-    # Get the base file path
-    base_file_path = None
-    if base_folder == ".":
-        base_file_path = os.path.dirname(executable_folder)
-    else:
-        base_file_path = os.path.dirname(base_folder)
+class VIEW_3D_PT_AeselAssetMgmtPanel(bpy.types.Panel):
+    bl_idname = "VIEW_3D_PT_aesel_asset_mgmt_panel"
+    bl_label = "Aesel Assets"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Aesel"
 
-    # Join the base file path with the scene
-    if current_scene_name != "":
-        target = os.path.join(base_file_path, current_scene_name)
-    else:
-        target = os.path.join(base_file_path, "default")
-
-    # If the target directory doesn't exist, create it
-    if not os.path.exists(target):
-        os.makedirs(target)
-
-    # Return the target directory
-    return target
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Export")
+        layout.operator("object.create_obj_asset")
+        layout.operator("object.create_blend_asset")

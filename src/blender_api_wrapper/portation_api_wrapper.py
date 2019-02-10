@@ -21,16 +21,16 @@ Created by Alex Barry
 import bpy
 
 class PortationApiWrapper(object):
-    def import_obj_file(filename):
+    def import_obj_file(self, filename):
         bpy.ops.import_scene.obj(filepath=filename)
 
-    def export_obj_file(filename):
-        bpy.ops.export_scene.obj(filepath=target_file, axis_up='Y', use_selection=False,
-                             use_mesh_modifiers=True, use_edges=True, use_normals=True,
-                             use_uvs=True, use_materials=True, use_nurbs=True,
-                             use_blen_objects=True, group_by_object=True, keep_vertex_order=True, global_scale=1)
+    def export_obj_file(self, filename):
+        bpy.ops.export_scene.obj(filepath=filename, axis_up='Y', use_selection=False,
+                                 use_mesh_modifiers=True, use_edges=True, use_normals=True,
+                                 use_uvs=True, use_materials=True, use_nurbs=True,
+                                 use_blen_objects=True, group_by_object=True, keep_vertex_order=True, global_scale=1)
 
-    def import_blend_file(filename, data_name):
+    def import_blend_file(self, filename, data_name):
         data_from = None
         data_to = None
         with bpy.data.libraries.load(filename) as (data_from, data_to):
@@ -45,5 +45,5 @@ class PortationApiWrapper(object):
                 if obj is not None:
                     bpy.context.scene.objects.link(obj)
 
-    def export_blend_file(filename):
-        bpy.ops.wm.save_as_mainfile(filepath=target_file, copy=True)
+    def export_blend_file(self, filename):
+        bpy.ops.wm.save_as_mainfile(filepath=filename, copy=True)

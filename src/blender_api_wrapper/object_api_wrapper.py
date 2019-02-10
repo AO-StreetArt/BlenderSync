@@ -36,11 +36,74 @@ class Object3dInterface(object):
     def set_property(self, prop_name, prop_val):
         self.blender_obj_ref[prop_name] = prop_val
 
+    def set_selection(self, selection):
+        self.blender_obj_ref.select_set(selection)
+
+    def selected(self):
+        return self.blender_obj_ref.select_get()
+
+    def get_location_x(self):
+        return self.blender_obj_ref.location.x
+
+    def set_location_x(self, new_loc):
+        self.blender_obj_ref.location.x = new_loc
+
+    def get_location_y(self):
+        return self.blender_obj_ref.location.y
+
+    def set_location_y(self, new_loc):
+        self.blender_obj_ref.location.y = new_loc
+
+    def get_location_z(self):
+        return self.blender_obj_ref.location.z
+
+    def set_location_z(self, new_loc):
+        self.blender_obj_ref.location.z = new_loc
+
+    def get_erotation_x(self):
+        return self.blender_obj_ref.rotation_euler.x
+
+    def set_erotation_x(self, new_rot):
+        self.blender_obj_ref.rotation_euler.x = new_rot
+
+    def get_erotation_y(self):
+        return self.blender_obj_ref.rotation_euler.y
+
+    def set_erotation_y(self, new_rot):
+        self.blender_obj_ref.rotation_euler.y = new_rot
+
+    def get_erotation_z(self):
+        return self.blender_obj_ref.rotation_euler.z
+
+    def set_erotation_z(self, new_rot):
+        self.blender_obj_ref.rotation_euler.z = new_rot
+
+    def get_scale_x(self):
+        return self.blender_obj_ref.scale.x
+
+    def set_scale_x(self, new_scl):
+        self.blender_obj_ref.scale.x = new_scl
+
+    def get_scale_y(self):
+        return self.blender_obj_ref.scale.y
+
+    def set_scale_y(self, new_scl):
+        self.blender_obj_ref.scale.y = new_scl
+
+    def get_scale_z(self):
+        return self.blender_obj_ref.scale.z
+
+    def set_scale_z(self, new_scl):
+        self.blender_obj_ref.scale.z = new_scl
+
     def set_transform(self, transform):
         self.blender_obj_ref.matrix_world = bpy.mathutils.Matrix(([transform[0], transform[1], transform[2], transform[3]],
                                                                   [transform[4], transform[5], transform[6], transform[7]],
                                                                   [transform[8], transform[9], transform[10], transform[11]],
                                                                   [transform[12], transform[13], transform[14], transform[15]]))
+
+    def get_transform(self):
+        return self.blender_obj_ref.matrix_world
 
 class ObjectApiWrapper(object):
     # Get the active object within a Blender context
@@ -49,3 +112,26 @@ class ObjectApiWrapper(object):
         for o in bpy.context.scene.objects:
             if o.select_get():
                 return Object3dInterface(o)
+
+    def get_object_by_name(self, name):
+        return Object3dInterface(bpy.data.objects[name])
+
+    def delete_selected_objects(self):
+        bpy.ops.object.delete()
+
+    def iterate_over_all_objects(self):
+        for object in bpy.data.objects:
+            yield Object3dInterface(object)
+
+    def select_all(self):
+        bpy.ops.object.select_all(action='SELECT')
+
+    def add_live_object(self, name, key):
+        bpy.context.scene.aesel_live_objects.append((key, name))
+
+    def remove_live_object(self, name, key):
+        bpy.context.scene.aesel_live_objects.remove((key, name))
+
+    def iterate_over_live_objects(self):
+        for obj in bpy.context.scene.aesel_live_objects:
+            yield obj

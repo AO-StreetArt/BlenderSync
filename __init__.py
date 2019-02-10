@@ -31,15 +31,18 @@ bl_info = {
 
 # Basic imports
 
-import time
-import threading
-import traceback
+import functools
 import queue
+import threading
+import time
+import traceback
 
 from aesel.AeselTransactionClient import AeselTransactionClient
 from aesel.AeselEventClient import AeselEventClient
 
 from aesel.model.AeselObject import AeselObject
+
+from .animation_client.queue_monitor import aesel_queue_monitor
 
 
 # load and reload submodules
@@ -47,22 +50,29 @@ from aesel.model.AeselObject import AeselObject
 
 if "bpy" in locals():
     import importlib
-    importlib.reload(bsync_utils)
-    importlib.reload(scene_mgmt)
-    importlib.reload(asset_mgmt)
-    importlib.reload(obj_mgmt)
-    importlib.reload(queue_monitor)
-    importlib.reload(obj_streaming)
+    importlib.reload(general_api_wrapper)
+    importlib.reload(object_api_wrapper)
+    importlib.reload(portation_api_wrapper)
+    importlib.reload(scene_mgmt_operators)
+    importlib.reload(asset_mgmt_operators)
+    importlib.reload(obj_mgmt_operators)
+    importlib.reload(obj_streaming_callbacks)
+    importlib.reload(test_operators)
+    importlib.reload(asset_mgmt_ui)
+    importlib.reload(obj_mgmt_ui)
+    importlib.reload(scene_mgmt_ui)
 else:
-    from .src import bsync_utils
-    from .src import scene_mgmt
-    from .src import asset_mgmt
-    from .src import obj_mgmt
-    from .src import queue_monitor
-    from .src import obj_streaming
-    from .src.blender_api_wrapper.general_api_wrapper import GeneralApiWrapper
-    from .src.blender_api_wrapper.object_api_wrapper import ObjectApiWrapper
-    from .src.blender_api_wrapper.portation_api_wrapper import PortationApiWrapper
+    from .src.blender_api_wrapper import general_api_wrapper
+    from .src.blender_api_wrapper import object_api_wrapper
+    from .src.blender_api_wrapper import portation_api_wrapper
+    from .src import scene_mgmt_operators
+    from .src import asset_mgmt_operators
+    from .src import obj_mgmt_operators
+    from .src import obj_streaming_callbacks
+    from .src import test_operators
+    from .src.ui import asset_mgmt_ui
+    from .src.ui import obj_mgmt_ui
+    from .src.ui import scene_mgmt_ui
 
 import bpy
 from bpy.props import (
@@ -223,23 +233,24 @@ classes = [SceneSettingItem,
             BlenderSyncPreferences,
             OBJECT_OT_AeselLogin,
             OBJECT_OT_SaveBlenderSyncPrefs,
-            scene_mgmt.VIEW_3D_UL_Scene_List,
-            scene_mgmt.OBJECT_OT_AddAeselScene,
-            scene_mgmt.OBJECT_OT_UpdateAeselScene,
-            scene_mgmt.OBJECT_OT_DeleteAeselScene,
-            scene_mgmt.OBJECT_OT_FindAeselScenes,
-            scene_mgmt.OBJECT_OT_RegisterAeselDevice,
-            scene_mgmt.OBJECT_OT_DeregisterAeselDevice,
-            scene_mgmt.OBJECT_OT_SaveSceneAsset,
-            scene_mgmt.VIEW_3D_PT_AeselScenePanel,
-            obj_mgmt.OBJECT_OT_CreateAeselObject,
-            obj_mgmt.OBJECT_OT_DeleteAeselObject,
-            obj_mgmt.OBJECT_OT_LockAeselObject,
-            obj_mgmt.OBJECT_OT_UnlockAeselObject,
-            obj_mgmt.VIEW_3D_PT_AeselObjectPanel,
-            asset_mgmt.OBJECT_OT_CreateObjAsset,
-            asset_mgmt.OBJECT_OT_CreateBlendAsset,
-            asset_mgmt.VIEW_3D_PT_AeselAssetMgmtPanel]
+            scene_mgmt_ui.VIEW_3D_UL_Scene_List,
+            scene_mgmt_operators.OBJECT_OT_AddAeselScene,
+            scene_mgmt_operators.OBJECT_OT_UpdateAeselScene,
+            scene_mgmt_operators.OBJECT_OT_DeleteAeselScene,
+            scene_mgmt_operators.OBJECT_OT_FindAeselScenes,
+            scene_mgmt_operators.OBJECT_OT_RegisterAeselDevice,
+            scene_mgmt_operators.OBJECT_OT_DeregisterAeselDevice,
+            scene_mgmt_operators.OBJECT_OT_SaveSceneAsset,
+            scene_mgmt_ui.VIEW_3D_PT_AeselScenePanel,
+            obj_mgmt_operators.OBJECT_OT_CreateAeselObject,
+            obj_mgmt_operators.OBJECT_OT_DeleteAeselObject,
+            obj_mgmt_operators.OBJECT_OT_LockAeselObject,
+            obj_mgmt_operators.OBJECT_OT_UnlockAeselObject,
+            obj_mgmt_ui.VIEW_3D_PT_AeselObjectPanel,
+            asset_mgmt_operators.OBJECT_OT_CreateObjAsset,
+            asset_mgmt_operators.OBJECT_OT_CreateBlendAsset,
+            asset_mgmt_ui.VIEW_3D_PT_AeselAssetMgmtPanel,
+            test_operators.OBJECT_OT_ExecuteBlenderSyncTests]
 
 def register():
     try:
@@ -260,18 +271,22 @@ def register():
     bpy.types.Scene.aesel_listen_live = bpy.props.BoolProperty()
     bpy.types.Scene.aesel_updates_live = bpy.props.BoolProperty()
     bpy.types.Scene.aesel_updates_initiated = bpy.props.BoolProperty()
-    bpy.types.Scene.general_api_wrapper = GeneralApiWrapper()
-    bpy.types.Scene.object_api_wrapper = ObjectApiWrapper()
-    bpy.types.Scene.portation_api_wrapper = PortationApiWrapper()
-    bpy.types.Scene.aesel_auto_updates = bpy.props.BoolProperty(name="Send Updates", update=obj_streaming.set_aesel_auto_update)
-    bpy.types.Scene.aesel_listen_for_updates = bpy.props.BoolProperty(name="Listen for Updates", update=obj_streaming.set_aesel_listen)
+    bpy.types.Scene.general_api_wrapper = general_api_wrapper.GeneralApiWrapper()
+    bpy.types.Scene.object_api_wrapper = object_api_wrapper.ObjectApiWrapper()
+    bpy.types.Scene.portation_api_wrapper = portation_api_wrapper.PortationApiWrapper()
+    bpy.types.Scene.aesel_auto_updates = bpy.props.BoolProperty(name="Send Updates", update=obj_streaming_callbacks.set_aesel_auto_update)
+    bpy.types.Scene.aesel_listen_for_updates = bpy.props.BoolProperty(name="Listen for Updates", update=obj_streaming_callbacks.set_aesel_listen)
     bpy.types.Scene.aesel_updates_queue = queue.Queue()
     bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for aesel_current_scenes", default = 0)
     bpy.types.Scene.current_scene_id = bpy.props.StringProperty(name = "Current Scene ID", default="")
     bpy.types.Scene.current_scene_name = bpy.props.StringProperty(name = "Current Scene Name", default="")
 
     # Register background functions
-    bpy.app.timers.register(queue_monitor.aesel_queue_monitor)
+    bpy.app.timers.register(functools.partial(aesel_queue_monitor,
+                                              bpy.types.Scene.general_api_wrapper,
+                                              bpy.types.Scene.object_api_wrapper,
+                                              bpy.types.Scene.portation_api_wrapper,
+                                              bpy.types.Scene.aesel_updates_queue))
 
 def unregister():
     # Shut down any scheduled methods

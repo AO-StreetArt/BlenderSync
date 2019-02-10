@@ -21,22 +21,58 @@ Created by Alex Barry
 import bpy
 
 class GeneralApiWrapper(object):
-    def get_addon_preferences():
+    def get_addon_preferences(self):
         return bpy.context.preferences.addons["BlenderSync"].preferences
 
-    def get_executable_filepath():
-        return bpy.data.filepath
+    def get_executable_filepath(self):
+        return bpy.app.binary_path
 
-    def get_current_scene_name():
+    def get_current_scene_id(self):
+        return bpy.context.scene.current_scene_id
+
+    def set_current_scene_id(self, new_id):
+        bpy.context.scene.current_scene_id = new_id
+
+    def get_current_scene_name(self):
         return bpy.context.scene.current_scene_name
 
-    def set_current_scene_name(new_name):
+    def set_current_scene_name(self, new_name):
         bpy.context.scene.current_scene_name = new_name
 
     # Get the scene currently selected in the scene list
-    def get_selected_scene():
+    def get_selected_scene(self):
         return bpy.context.scene.aesel_current_scenes[bpy.context.scene.list_index].key
 
     # Get the scene currently selected in the scene list
-    def get_selected_scene_name():
+    def get_selected_scene_name(self):
         return bpy.context.scene.aesel_current_scenes[bpy.context.scene.list_index].name
+
+    def add_to_scenes_ui_list(self, name, key):
+        new_item = bpy.context.scene.aesel_current_scenes.add()
+        new_item.name = name
+        new_item.key = key
+
+    def update_scenes_ui_list(self, name, key):
+        for index, item in enumerate(bpy.context.scene.aesel_current_scenes):
+            if key == item.key:
+                bpy.context.scene.aesel_current_scenes[index].name = name
+
+    def remove_from_scenes_ui_list(self, key):
+        for index, item in enumerate(bpy.context.scene.aesel_current_scenes):
+            if key == item.key:
+                bpy.context.scene.aesel_current_scenes.remove(index)
+
+    def clear_scenes_ui_list(self):
+        bpy.context.scene.aesel_current_scenes.clear()
+
+    def is_udp_listener_active(self):
+        return bpy.context.scene.aesel_listen_live
+
+    def set_udp_listener_active(self, new_active):
+        bpy.context.scene.aesel_listen_live = new_active
+
+    def is_udp_sender_active(self):
+        return bpy.context.scene.aesel_updates_live
+
+    def set_udp_sender_active(self, new_active):
+        bpy.context.scene.aesel_updates_live = new_active

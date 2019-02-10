@@ -18,7 +18,7 @@ Created by Alex Barry
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import bpy, bpy_extras
+import bpy
 from bpy.props import (
             BoolProperty,
             CollectionProperty,
@@ -31,7 +31,7 @@ from bpy.props import (
             )
 import threading
 
-from .asset_mgmt import save_selected_as_obj_asset, save_scene_as_blend_asset
+from ..animation_client.asset_mgmt import save_selected_as_obj_asset, save_scene_as_blend_asset
 
 
 # Create an Asset by exporting to obj
@@ -94,17 +94,3 @@ class OBJECT_OT_CreateBlendAsset(bpy.types.Operator):
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
-
-
-class VIEW_3D_PT_AeselAssetMgmtPanel(bpy.types.Panel):
-    bl_idname = "VIEW_3D_PT_aesel_asset_mgmt_panel"
-    bl_label = "Aesel Assets"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "Aesel"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="Export")
-        layout.operator("object.create_obj_asset")
-        layout.operator("object.create_blend_asset")
