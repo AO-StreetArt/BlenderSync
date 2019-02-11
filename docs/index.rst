@@ -13,3 +13,4 @@
 
    pages/install.rst
    pages/quickstart.rst
+   pages/tests.rst

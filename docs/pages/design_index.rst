@@ -13,3 +13,6 @@ Design Documents
    :caption: Contents:
 
    asset_design.rst
+   object_design.rst
+   property_design.rst
+   scene_design.rst
