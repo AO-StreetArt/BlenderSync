@@ -110,7 +110,6 @@ def portation_api_tests(context, portation_api_wrapper):
     bpy.ops.mesh.primitive_cube_add(size=2, view_align=False, enter_editmode=False, location=(1, 1, 1))
 
     # Obj tests
-    os.remove("test_obj_export.obj")
     portation_api_wrapper.export_obj_file("test_obj_export.obj")
 
     # Clear the viewport
@@ -127,8 +126,9 @@ def portation_api_tests(context, portation_api_wrapper):
             assert(o.location.x - 1.0 < 0.01)
     assert(obj_exists)
 
+    os.remove("test_obj_export.obj")
+
     # Blend tests
-    os.remove("test_blend_export.blend")
     portation_api_wrapper.export_blend_file("test_blend_export.blend")
 
     # Clear the viewport
@@ -139,11 +139,11 @@ def portation_api_tests(context, portation_api_wrapper):
     portation_api_wrapper.import_blend_file("test_blend_export.blend", obj_name)
     obj_exists = False
     for o in bpy.context.scene.objects:
-        if o.select_get():
-            obj_exists = True
-            assert(o.location.x - 1.0 < 0.01)
+        obj_exists = True
+        assert(o.location.x - 1.0 < 0.01)
     assert(obj_exists)
 
+    os.remove("test_blend_export.blend")
 
 def get_exc_details():
     _, _, tb = sys.exc_info()

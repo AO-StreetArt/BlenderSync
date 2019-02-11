@@ -42,4 +42,4 @@ fi
 sudo rm -r tmp/
 
 # Generate our final zip file
-cd ../ && zip -r BlenderSync.zip BlenderSync/ -x *.git*
+cd ../ && zip -r BlenderSync.zip BlenderSync/ -x *.git* -x *.blend

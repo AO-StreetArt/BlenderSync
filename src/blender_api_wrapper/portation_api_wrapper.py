@@ -43,7 +43,7 @@ class PortationApiWrapper(object):
         if data_to is not None:
             for obj in data_to.objects:
                 if obj is not None:
-                    bpy.context.scene.objects.link(obj)
+                    bpy.context.scene.collection.objects.link(obj)
 
     def export_blend_file(self, filename):
         bpy.ops.wm.save_as_mainfile(filepath=filename, copy=True)
