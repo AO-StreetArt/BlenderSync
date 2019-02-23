@@ -45,5 +45,30 @@ class PortationApiWrapper(object):
                 if obj is not None:
                     bpy.context.scene.collection.objects.link(obj)
 
+    def import_blend_asset(self, filename, data_map, collection_name):
+        data_names = [data_elt["assetSubId"] for data_elt in data_map]
+        data_from = None
+        data_to = None
+        with bpy.data.libraries.load(filename) as (data_from, data_to):
+            if data_type == "object":
+                data_to.objects = [name for name in data_from.objects if name in data_names]
+
+        # Find/Create collection to link to
+        collection = None
+        existing_collection_list = bpy.context.scene.collection.children.keys()
+        if collection_name not in existing_collection_list:
+            # Create a new collection
+            collection = bpy.data.collections.new(collection_name)
+            bpy.context.scene.collection.children.link(collection)
+        else:
+            collection = bpy.context.scene.collection.children.get(collection_name)
+
+        # Hook each imported object into the scene
+        if data_to is not None:
+            for obj in data_to.objects:
+                if obj is not None:
+                    # Link the data to the collection
+                    collection.objects.link(obj)
+
     def export_blend_file(self, filename):
         bpy.ops.wm.save_as_mainfile(filepath=filename, copy=True)

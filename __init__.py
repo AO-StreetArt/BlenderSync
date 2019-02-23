@@ -21,7 +21,7 @@ Created by Alex Barry
 bl_info = {
     "name": "BlenderSync",
     "description": "Blender Add-on to Integrate with Aesel Servers",
-    "author": "Your Name",
+    "author": "Alex Barry",
     "version": (0, 0, 3),
     "blender": (2, 80, 0),
     "location": "View3D",

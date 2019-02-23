@@ -30,6 +30,18 @@ class Object3dInterface(object):
     def set_name(self, new_name):
         self.blender_obj_ref.name = new_name
 
+    def get_type(self):
+        return self.blender_obj_ref.type
+
+    def set_type(self, new_type):
+        self.blender_obj_ref.type = new_type
+
+    def get_parent(self):
+        return Object3dInterface(self.blender_obj_ref.parent)
+
+    def set_parent(self, new_parent):
+        self.blender_obj_ref.parent = new_parent.blender_obj_ref
+
     def get_property(self, prop_name):
         return self.blender_obj_ref[prop_name]
 
@@ -122,6 +134,12 @@ class ObjectApiWrapper(object):
     def iterate_over_all_objects(self):
         for object in bpy.data.objects:
             yield Object3dInterface(object)
+
+    def iterate_over_selected_objects(self):
+        active_obj = None
+        for o in bpy.context.scene.objects:
+            if o.select_get():
+                yield Object3dInterface(o)
 
     def select_all(self):
         bpy.ops.object.select_all(action='SELECT')
