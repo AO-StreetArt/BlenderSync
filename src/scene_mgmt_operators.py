@@ -176,6 +176,7 @@ class OBJECT_OT_SaveSceneAsset(bpy.types.Operator):
         # Execute the request to save the asset on a background thread
         save_thread = threading.Thread(target=_save_scene_asset,
                                        args=(bpy.context.scene.general_api_wrapper,
+                                             bpy.context.scene.object_api_wrapper,
                                              bpy.context.scene.portation_api_wrapper,
                                              bpy.types.Scene.transaction_client,
                                              self.asset_name,

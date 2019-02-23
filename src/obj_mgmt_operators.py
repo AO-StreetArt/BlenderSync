@@ -30,7 +30,7 @@ class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        new_obj = _initiate_create_aesel_obj_flow(bpy.context.scene.general_api_wrapper,
+        new_objs = _initiate_create_aesel_obj_flow(bpy.context.scene.general_api_wrapper,
                                                   bpy.context.scene.portation_api_wrapper,
                                                   bpy.context.scene.object_api_wrapper,
                                                   bpy.types.Scene.transaction_client,
@@ -43,7 +43,7 @@ class OBJECT_OT_CreateAeselObject(bpy.types.Operator):
                                              bpy.context.scene.object_api_wrapper,
                                              bpy.types.Scene.transaction_client,
                                              bpy.context.scene.aesel_updates_queue,
-                                             new_obj))
+                                             new_objs))
         save_thread.daemon = True
         save_thread.start()
 

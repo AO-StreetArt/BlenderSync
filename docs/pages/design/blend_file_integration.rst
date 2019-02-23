@@ -18,13 +18,13 @@ Basic Scene Structure
 Within each Scene, we will have a number of collections:
 
 * One for all Scene Assets
-* One for each Aesel Object
+* One for each Aesel Object at the top of a parent-child chain
 
 Scene Assets will simply be imported into the Scene Asset Collection, but each
-Object Asset will need to be imported into it's respective Collection, and linked
-to a parent.  Each Object Collection will contain a single parent Blender object, which
-will align with the Aesel Object.  All of the various assets associated to that
-Aesel Object will be imported as children of the Blender parent (an Empty).
+Object Asset will need to be imported into it's respective Collection, and potentially
+linked to a parent.  Parent-child relationships will be stored in the 'parent'
+field of the object in Aesel.  Each object in Aesel will correspond to an object
+in a Blend File.
 
 Sub ID's and Subtypes
 ---------------------

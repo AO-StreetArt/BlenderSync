@@ -84,6 +84,9 @@ def object_api_tests(context, object_api_wrapper):
     active_obj = object_api_wrapper.get_active_object()
     assert(active_obj.get_location_x() - 0.0 < 0.01)
 
+    for active_obj in object_api_wrapper.iterate_over_selected_objects():
+        assert(active_obj.get_location_x() - 0.0 < 0.01)
+
     obj_view = object_api_wrapper.get_object_by_name(active_obj.get_name())
     assert(obj_view.get_location_x() - 0.0 < 0.01)
 
