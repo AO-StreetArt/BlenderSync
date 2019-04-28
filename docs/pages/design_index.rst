@@ -12,8 +12,8 @@ Design Documents
    :maxdepth: 1
    :caption: Contents:
 
-   asset_design.rst
-   object_design.rst
-   property_design.rst
-   scene_design.rst
-   flow_design.rst
+   design/asset_design.rst
+   design/object_design.rst
+   design/property_design.rst
+   design/scene_design.rst
+   design/flow_design.rst
